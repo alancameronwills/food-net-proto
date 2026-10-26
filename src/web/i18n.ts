@@ -4,8 +4,8 @@ import type { Bilingual } from '../shared/types';
 
 // Welsh strings are machine-translated drafts, pending human review.
 const en = {
-  title: 'Bwyd Lleol Sir Benfro',
-  tagline: 'Pembrokeshire local food network',
+  title: 'Bwyd Lleol Bro Teifi',
+  tagline: 'Teifi Valley local food network',
   chooseRole: 'Who are you playing today?',
   chooseHint: 'Pick an organisation to see the network through their eyes. Share a link so others can join as another role.',
   buyers: 'Buyers', producers: 'Producers', operatorRole: 'Network operator',
@@ -25,8 +25,8 @@ const en = {
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
 };
 const cy: typeof en = {
-  title: 'Bwyd Lleol Sir Benfro',
-  tagline: 'Rhwydwaith bwyd lleol Sir Benfro',
+  title: 'Bwyd Lleol Bro Teifi',
+  tagline: 'Rhwydwaith bwyd lleol Bro Teifi',
   chooseRole: 'Pwy ydych chi’n ei chwarae heddiw?',
   chooseHint: 'Dewiswch sefydliad i weld y rhwydwaith drwy ei lygaid. Rhannwch ddolen i eraill ymuno mewn rôl arall.',
   buyers: 'Prynwyr', producers: 'Cynhyrchwyr', operatorRole: 'Gweithredwr y rhwydwaith',

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Bwyd Lleol Sir Benfro - local food network prototype",
+  "description": "Bwyd Lleol Bro Teifi - local food network prototype",
   "scripts": {
     "db:up": "docker compose up -d dynamodb",
     "db:down": "docker compose down",

@@ -17,9 +17,9 @@
     "role": "buyer",
     "name": "Grand Hotel",
     "kind": "hotel",
-    "town": "Tenby",
-    "lat": 51.673,
-    "lon": -4.702,
+    "town": "Mwnt",
+    "lat": 52.165,
+    "lon": -4.64,
     "blurb": {
       "en": "80-bedroom hotel with a busy breakfast and banqueting trade.",
       "cy": "Gwesty 80 ystafell gyda brecwast prysur a gwleddoedd."
@@ -30,9 +30,9 @@
     "role": "buyer",
     "name": "Corner Deli",
     "kind": "retailer",
-    "town": "Narberth",
-    "lat": 51.798,
-    "lon": -4.742,
+    "town": "Newport",
+    "lat": 52.016,
+    "lon": -4.382,
     "blurb": {
       "en": "Independent delicatessen and village shop.",
       "cy": "Delicatessen annibynnol a siop pentref."
@@ -43,9 +43,9 @@
     "role": "buyer",
     "name": "Castle Caterers",
     "kind": "caterer",
-    "town": "Pembroke",
-    "lat": 51.675,
-    "lon": -4.915,
+    "town": "Cilgerran",
+    "lat": 52.057,
+    "lon": -4.364,
     "blurb": {
       "en": "Weddings and events across the county.",
       "cy": "Priodasau a digwyddiadau ar draws y sir."
@@ -96,9 +96,9 @@
     "role": "producer",
     "name": "Dyfed Dairy",
     "kind": "dairy",
-    "town": "Newport",
-    "lat": 52.02,
-    "lon": -4.84,
+    "town": "Cenarth",
+    "lat": 52.04,
+    "lon": -4.54,
     "blurb": {
       "en": "Family dairy: milk, cream, eggs and cheddar.",
       "cy": "Llaethdy teuluol: llaeth, hufen, wyau a cheddar."
@@ -132,13 +132,13 @@
     ]
   },
   {
-    "id": "cleddau-creamery",
+    "id": "brongest-creamery",
     "role": "producer",
-    "name": "Cleddau Creamery",
+    "name": "Brongest Creamery",
     "kind": "dairy",
-    "town": "Templeton",
-    "lat": 51.78,
-    "lon": -4.76,
+    "town": "Brongest",
+    "lat": 52.08,
+    "lon": -4.444,
     "blurb": {
       "en": "Small creamery making milk, cream and blue cheese.",
       "cy": "Hufenfa fach yn gwneud llaeth, hufen a chaws glas."
@@ -162,13 +162,13 @@
     ]
   },
   {
-    "id": "solva-catch",
+    "id": "dinas-catch",
     "role": "producer",
-    "name": "Solva Catch",
+    "name": "Dinas Catch",
     "kind": "fisher",
-    "town": "Solva",
-    "lat": 51.88,
-    "lon": -5.2,
+    "town": "Dinas",
+    "lat": 52.02,
+    "lon": -4.909,
     "blurb": {
       "en": "Day-boat crab, lobster and line-caught fish.",
       "cy": "Cranc, cimwch a physgod llinell o’r cwch dydd."
@@ -200,13 +200,13 @@
     ]
   },
   {
-    "id": "haverfordwest-bakery",
+    "id": "nevern-bakery",
     "role": "producer",
-    "name": "Haverfordwest Bakery",
+    "name": "Nevern Bakery",
     "kind": "baker",
-    "town": "Haverfordwest",
-    "lat": 51.8,
-    "lon": -4.97,
+    "town": "Nevern",
+    "lat": 52.025,
+    "lon": -4.796,
     "blurb": {
       "en": "Sourdough and traditional Welsh bakes.",
       "cy": "Surdoes a nwyddau pobi Cymreig traddodiadol."
@@ -225,13 +225,13 @@
     ]
   },
   {
-    "id": "castlemorris-garden",
+    "id": "brynberian-garden",
     "role": "producer",
-    "name": "Castlemorris Market Garden",
+    "name": "Brynberian Market Garden",
     "kind": "farm",
-    "town": "Castlemorris",
-    "lat": 51.95,
-    "lon": -5.05,
+    "town": "Brynberian",
+    "lat": 51.98,
+    "lon": -4.766,
     "blurb": {
       "en": "Seasonal vegetables, salads and free-range eggs.",
       "cy": "Llysiau tymhorol, saladau a wyau buarth."
@@ -268,13 +268,13 @@
     ]
   },
   {
-    "id": "pembroke-butchers",
+    "id": "teifi-butchers",
     "role": "producer",
-    "name": "Pembroke Butchers",
+    "name": "Teifi Butchers",
     "kind": "butcher",
-    "town": "Pembroke Dock",
-    "lat": 51.69,
-    "lon": -4.94,
+    "town": "Cardigan",
+    "lat": 52.08,
+    "lon": -4.664,
     "blurb": {
       "en": "Local lamb, beef and sausages.",
       "cy": "Oen, cig eidion a selsig lleol."
@@ -298,13 +298,13 @@
     ]
   },
   {
-    "id": "angle-bay-seafood",
+    "id": "netpool-seafood",
     "role": "producer",
-    "name": "Angle Bay Seafood Packers",
+    "name": "Netpool Seafood Packers",
     "kind": "packer",
-    "town": "Angle",
-    "lat": 51.68,
-    "lon": -5.08,
+    "town": "St Dogmaels",
+    "lat": 52.08,
+    "lon": -4.67,
     "blurb": {
       "en": "Packing and processing local shellfish and fish.",
       "cy": "Pacio a phrosesu pysgod cregyn a physgod lleol."
@@ -360,11 +360,11 @@
   {
     "id": "operator",
     "role": "operator",
-    "name": "Bwyd Lleol Sir Benfro",
+    "name": "Bwyd Lleol Bro Teifi",
     "kind": "network",
-    "town": "Haverfordwest",
-    "lat": 51.8,
-    "lon": -4.97,
+    "town": "Rhosygilwen",
+    "lat": 52.03,
+    "lon": -4.619,
     "blurb": {
       "en": "Network operator: onboarding, models and oversight.",
       "cy": "Gweithredwr y rhwydwaith: ymuno, modelau a goruchwylio."

@@ -18,7 +18,7 @@ test('role picker offers buyers, producers and the operator', async ({ page }) =
   await page.evaluate(() => localStorage.removeItem('persona'));
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Who are you playing today?' })).toBeVisible();
-  for (const name of ['Grand Hotel', 'Dyfed Dairy', 'Bwyd Lleol Sir Benfro']) {
+  for (const name of ['Grand Hotel', 'Dyfed Dairy', 'Bwyd Lleol Bro Teifi']) {
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
 });
