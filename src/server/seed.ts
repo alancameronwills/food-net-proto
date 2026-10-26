@@ -7,44 +7,10 @@ import type {
   Product,
   SupplyWindow,
 } from '../shared/types';
+import organisationsJson from '../../data/organisations.json';
+import { parseOrganisations } from './organisations';
 
 /** Deterministic demo data, with all dates relative to `today`. */
-
-const org = (
-  id: string, role: Organisation['role'], name: string, kind: string, town: string,
-  lat: number, lon: number, en: string, cy: string,
-): Organisation => ({ id, role, name, kind, town, lat, lon, blurb: { en, cy } });
-
-export const ORGS: Organisation[] = [
-  org('harbour-bistro', 'buyer', 'Harbour Bistro', 'restaurant', 'Fishguard', 52.0, -4.98,
-    'Seafront bistro with a daily-changing menu.', 'Bistro glan môr gyda bwydlen sy’n newid bob dydd.'),
-  org('grand-hotel', 'buyer', 'Grand Hotel', 'hotel', 'Tenby', 51.673, -4.702,
-    '80-bedroom hotel with a busy breakfast and banqueting trade.', 'Gwesty 80 ystafell gyda brecwast prysur a gwleddoedd.'),
-  org('corner-deli', 'buyer', 'Corner Deli', 'retailer', 'Narberth', 51.798, -4.742,
-    'Independent delicatessen and village shop.', 'Delicatessen annibynnol a siop pentref.'),
-  org('castle-caterers', 'buyer', 'Castle Caterers', 'caterer', 'Pembroke', 51.675, -4.915,
-    'Weddings and events across the county.', 'Priodasau a digwyddiadau ar draws y sir.'),
-  org('preseli-hill-farm', 'producer', 'Preseli Hill Farm', 'farm', 'Crymych', 51.98, -4.65,
-    'Upland lamb, beef and root vegetables.', 'Oen, cig eidion a llysiau gwraidd o’r ucheldir.'),
-  org('dyfed-dairy', 'producer', 'Dyfed Dairy', 'dairy', 'Newport', 52.02, -4.84,
-    'Family dairy: milk, cream, eggs and cheddar.', 'Llaethdy teuluol: llaeth, hufen, wyau a cheddar.'),
-  org('cleddau-creamery', 'producer', 'Cleddau Creamery', 'dairy', 'Templeton', 51.78, -4.76,
-    'Small creamery making milk, cream and blue cheese.', 'Hufenfa fach yn gwneud llaeth, hufen a chaws glas.'),
-  org('solva-catch', 'producer', 'Solva Catch', 'fisher', 'Solva', 51.88, -5.2,
-    'Day-boat crab, lobster and line-caught fish.', 'Cranc, cimwch a physgod llinell o’r cwch dydd.'),
-  org('haverfordwest-bakery', 'producer', 'Haverfordwest Bakery', 'baker', 'Haverfordwest', 51.80, -4.97,
-    'Sourdough and traditional Welsh bakes.', 'Surdoes a nwyddau pobi Cymreig traddodiadol.'),
-  org('castlemorris-garden', 'producer', 'Castlemorris Market Garden', 'farm', 'Castlemorris', 51.95, -5.05,
-    'Seasonal vegetables, salads and free-range eggs.', 'Llysiau tymhorol, saladau a wyau buarth.'),
-  org('pembroke-butchers', 'producer', 'Pembroke Butchers', 'butcher', 'Pembroke Dock', 51.69, -4.94,
-    'Local lamb, beef and sausages.', 'Oen, cig eidion a selsig lleol.'),
-  org('angle-bay-seafood', 'producer', 'Angle Bay Seafood Packers', 'packer', 'Angle', 51.68, -5.08,
-    'Packing and processing local shellfish and fish.', 'Pacio a phrosesu pysgod cregyn a physgod lleol.'),
-  org('teifi-valley-cheese', 'producer', 'Teifi Valley Cheese', 'dairy', 'Newcastle Emlyn', 52.04, -4.47,
-    'Farmhouse cheeses and a little milk.', 'Cawsiau fferm ac ychydig o laeth.'),
-  org('operator', 'operator', 'Bwyd Lleol Sir Benfro', 'network', 'Haverfordwest', 51.80, -4.97,
-    'Network operator: onboarding, models and oversight.', 'Gweithredwr y rhwydwaith: ymuno, modelau a goruchwylio.'),
-];
 
 const cat = (id: Category['id'], en: string, cy: string, maxDriveKm: number, deliveryDays: number[], leadDays: number): Category =>
   ({ id, name: { en, cy }, maxDriveKm, deliveryDays, leadDays });
@@ -87,29 +53,10 @@ export const PRODUCTS: Product[] = [
   prod('cheese-blue', 'cheese', 'Blue cheese', 'Caws glas', 'kg', ['milk']),
 ];
 
-/** producerId -> [productId, price per unit, min order][] */
-const OFFERS: Record<string, [string, number, number][]> = {
-  'preseli-hill-farm': [['meat-lamb', 14.5, 2], ['meat-beef', 24, 2], ['veg-leek', 2.4, 5], ['veg-potato', 1.8, 10], ['veg-carrot', 1.2, 10]],
-  'dyfed-dairy': [['milk-whole', 0.95, 10], ['milk-semi', 0.9, 10], ['cream-double', 4.2, 2], ['cheese-cheddar', 13, 1], ['eggs-free', 3.4, 5]],
-  'cleddau-creamery': [['milk-whole', 1.0, 10], ['cream-double', 4.5, 2], ['cheese-blue', 18, 1]],
-  'solva-catch': [['fish-crab', 6.5, 6], ['fish-lobster', 38, 2], ['fish-bass', 21, 2], ['fish-mackerel', 7.5, 3]],
-  'haverfordwest-bakery': [['bread-sour', 3.6, 6], ['bara-brith', 4.5, 4]],
-  'castlemorris-garden': [['veg-leek', 2.2, 5], ['veg-carrot', 1.1, 10], ['veg-tomato', 6.8, 3], ['veg-kale', 4.5, 2], ['eggs-free', 3.2, 5]],
-  'pembroke-butchers': [['meat-lamb', 15.2, 2], ['meat-beef', 25, 2], ['meat-sausage', 9.8, 3]],
-  'angle-bay-seafood': [['fish-crab', 6.2, 12], ['fish-mackerel', 7, 5], ['fish-bass', 20, 3]],
-  'teifi-valley-cheese': [['cheese-cheddar', 12.5, 1], ['cheese-blue', 17, 1], ['milk-whole', 0.9, 20]],
-};
-
-export const LISTINGS: Listing[] = Object.entries(OFFERS).flatMap(([producerId, rows]) =>
-  rows.map(([productId, pricePerUnit, minOrder]) => ({
-    id: `${producerId}:${productId}`,
-    producerId,
-    productId,
-    pricePerUnit,
-    minOrder,
-    certifications: producerId === 'castlemorris-garden' ? ['organic'] : producerId === 'solva-catch' ? ['msc-line-caught'] : [],
-  })),
-);
+// Organisations (and each producer's offers) are edited in data/organisations.json.
+const loaded = parseOrganisations(organisationsJson, new Set(PRODUCTS.map((p) => p.id)));
+export const ORGS: Organisation[] = loaded.orgs;
+export const LISTINGS: Listing[] = loaded.listings;
 
 const BASE_QTY: Record<Category['id'], number> = { milk: 200, bread: 40, eggs: 60, veg: 80, meat: 40, fish: 25, cheese: 30 };
 

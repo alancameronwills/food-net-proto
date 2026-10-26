@@ -1,0 +1,373 @@
+[
+  {
+    "id": "harbour-bistro",
+    "role": "buyer",
+    "name": "Harbour Bistro",
+    "kind": "restaurant",
+    "town": "Fishguard",
+    "lat": 52,
+    "lon": -4.98,
+    "blurb": {
+      "en": "Seafront bistro with a daily-changing menu.",
+      "cy": "Bistro glan môr gyda bwydlen sy’n newid bob dydd."
+    }
+  },
+  {
+    "id": "grand-hotel",
+    "role": "buyer",
+    "name": "Grand Hotel",
+    "kind": "hotel",
+    "town": "Tenby",
+    "lat": 51.673,
+    "lon": -4.702,
+    "blurb": {
+      "en": "80-bedroom hotel with a busy breakfast and banqueting trade.",
+      "cy": "Gwesty 80 ystafell gyda brecwast prysur a gwleddoedd."
+    }
+  },
+  {
+    "id": "corner-deli",
+    "role": "buyer",
+    "name": "Corner Deli",
+    "kind": "retailer",
+    "town": "Narberth",
+    "lat": 51.798,
+    "lon": -4.742,
+    "blurb": {
+      "en": "Independent delicatessen and village shop.",
+      "cy": "Delicatessen annibynnol a siop pentref."
+    }
+  },
+  {
+    "id": "castle-caterers",
+    "role": "buyer",
+    "name": "Castle Caterers",
+    "kind": "caterer",
+    "town": "Pembroke",
+    "lat": 51.675,
+    "lon": -4.915,
+    "blurb": {
+      "en": "Weddings and events across the county.",
+      "cy": "Priodasau a digwyddiadau ar draws y sir."
+    }
+  },
+  {
+    "id": "preseli-hill-farm",
+    "role": "producer",
+    "name": "Preseli Hill Farm",
+    "kind": "farm",
+    "town": "Crymych",
+    "lat": 51.98,
+    "lon": -4.65,
+    "blurb": {
+      "en": "Upland lamb, beef and root vegetables.",
+      "cy": "Oen, cig eidion a llysiau gwraidd o’r ucheldir."
+    },
+    "offers": [
+      {
+        "product": "meat-lamb",
+        "price": 14.5,
+        "minOrder": 2
+      },
+      {
+        "product": "meat-beef",
+        "price": 24,
+        "minOrder": 2
+      },
+      {
+        "product": "veg-leek",
+        "price": 2.4,
+        "minOrder": 5
+      },
+      {
+        "product": "veg-potato",
+        "price": 1.8,
+        "minOrder": 10
+      },
+      {
+        "product": "veg-carrot",
+        "price": 1.2,
+        "minOrder": 10
+      }
+    ]
+  },
+  {
+    "id": "dyfed-dairy",
+    "role": "producer",
+    "name": "Dyfed Dairy",
+    "kind": "dairy",
+    "town": "Newport",
+    "lat": 52.02,
+    "lon": -4.84,
+    "blurb": {
+      "en": "Family dairy: milk, cream, eggs and cheddar.",
+      "cy": "Llaethdy teuluol: llaeth, hufen, wyau a cheddar."
+    },
+    "offers": [
+      {
+        "product": "milk-whole",
+        "price": 0.95,
+        "minOrder": 10
+      },
+      {
+        "product": "milk-semi",
+        "price": 0.9,
+        "minOrder": 10
+      },
+      {
+        "product": "cream-double",
+        "price": 4.2,
+        "minOrder": 2
+      },
+      {
+        "product": "cheese-cheddar",
+        "price": 13,
+        "minOrder": 1
+      },
+      {
+        "product": "eggs-free",
+        "price": 3.4,
+        "minOrder": 5
+      }
+    ]
+  },
+  {
+    "id": "cleddau-creamery",
+    "role": "producer",
+    "name": "Cleddau Creamery",
+    "kind": "dairy",
+    "town": "Templeton",
+    "lat": 51.78,
+    "lon": -4.76,
+    "blurb": {
+      "en": "Small creamery making milk, cream and blue cheese.",
+      "cy": "Hufenfa fach yn gwneud llaeth, hufen a chaws glas."
+    },
+    "offers": [
+      {
+        "product": "milk-whole",
+        "price": 1,
+        "minOrder": 10
+      },
+      {
+        "product": "cream-double",
+        "price": 4.5,
+        "minOrder": 2
+      },
+      {
+        "product": "cheese-blue",
+        "price": 18,
+        "minOrder": 1
+      }
+    ]
+  },
+  {
+    "id": "solva-catch",
+    "role": "producer",
+    "name": "Solva Catch",
+    "kind": "fisher",
+    "town": "Solva",
+    "lat": 51.88,
+    "lon": -5.2,
+    "blurb": {
+      "en": "Day-boat crab, lobster and line-caught fish.",
+      "cy": "Cranc, cimwch a physgod llinell o’r cwch dydd."
+    },
+    "certifications": [
+      "msc-line-caught"
+    ],
+    "offers": [
+      {
+        "product": "fish-crab",
+        "price": 6.5,
+        "minOrder": 6
+      },
+      {
+        "product": "fish-lobster",
+        "price": 38,
+        "minOrder": 2
+      },
+      {
+        "product": "fish-bass",
+        "price": 21,
+        "minOrder": 2
+      },
+      {
+        "product": "fish-mackerel",
+        "price": 7.5,
+        "minOrder": 3
+      }
+    ]
+  },
+  {
+    "id": "haverfordwest-bakery",
+    "role": "producer",
+    "name": "Haverfordwest Bakery",
+    "kind": "baker",
+    "town": "Haverfordwest",
+    "lat": 51.8,
+    "lon": -4.97,
+    "blurb": {
+      "en": "Sourdough and traditional Welsh bakes.",
+      "cy": "Surdoes a nwyddau pobi Cymreig traddodiadol."
+    },
+    "offers": [
+      {
+        "product": "bread-sour",
+        "price": 3.6,
+        "minOrder": 6
+      },
+      {
+        "product": "bara-brith",
+        "price": 4.5,
+        "minOrder": 4
+      }
+    ]
+  },
+  {
+    "id": "castlemorris-garden",
+    "role": "producer",
+    "name": "Castlemorris Market Garden",
+    "kind": "farm",
+    "town": "Castlemorris",
+    "lat": 51.95,
+    "lon": -5.05,
+    "blurb": {
+      "en": "Seasonal vegetables, salads and free-range eggs.",
+      "cy": "Llysiau tymhorol, saladau a wyau buarth."
+    },
+    "certifications": [
+      "organic"
+    ],
+    "offers": [
+      {
+        "product": "veg-leek",
+        "price": 2.2,
+        "minOrder": 5
+      },
+      {
+        "product": "veg-carrot",
+        "price": 1.1,
+        "minOrder": 10
+      },
+      {
+        "product": "veg-tomato",
+        "price": 6.8,
+        "minOrder": 3
+      },
+      {
+        "product": "veg-kale",
+        "price": 4.5,
+        "minOrder": 2
+      },
+      {
+        "product": "eggs-free",
+        "price": 3.2,
+        "minOrder": 5
+      }
+    ]
+  },
+  {
+    "id": "pembroke-butchers",
+    "role": "producer",
+    "name": "Pembroke Butchers",
+    "kind": "butcher",
+    "town": "Pembroke Dock",
+    "lat": 51.69,
+    "lon": -4.94,
+    "blurb": {
+      "en": "Local lamb, beef and sausages.",
+      "cy": "Oen, cig eidion a selsig lleol."
+    },
+    "offers": [
+      {
+        "product": "meat-lamb",
+        "price": 15.2,
+        "minOrder": 2
+      },
+      {
+        "product": "meat-beef",
+        "price": 25,
+        "minOrder": 2
+      },
+      {
+        "product": "meat-sausage",
+        "price": 9.8,
+        "minOrder": 3
+      }
+    ]
+  },
+  {
+    "id": "angle-bay-seafood",
+    "role": "producer",
+    "name": "Angle Bay Seafood Packers",
+    "kind": "packer",
+    "town": "Angle",
+    "lat": 51.68,
+    "lon": -5.08,
+    "blurb": {
+      "en": "Packing and processing local shellfish and fish.",
+      "cy": "Pacio a phrosesu pysgod cregyn a physgod lleol."
+    },
+    "offers": [
+      {
+        "product": "fish-crab",
+        "price": 6.2,
+        "minOrder": 12
+      },
+      {
+        "product": "fish-mackerel",
+        "price": 7,
+        "minOrder": 5
+      },
+      {
+        "product": "fish-bass",
+        "price": 20,
+        "minOrder": 3
+      }
+    ]
+  },
+  {
+    "id": "teifi-valley-cheese",
+    "role": "producer",
+    "name": "Teifi Valley Cheese",
+    "kind": "dairy",
+    "town": "Newcastle Emlyn",
+    "lat": 52.04,
+    "lon": -4.47,
+    "blurb": {
+      "en": "Farmhouse cheeses and a little milk.",
+      "cy": "Cawsiau fferm ac ychydig o laeth."
+    },
+    "offers": [
+      {
+        "product": "cheese-cheddar",
+        "price": 12.5,
+        "minOrder": 1
+      },
+      {
+        "product": "cheese-blue",
+        "price": 17,
+        "minOrder": 1
+      },
+      {
+        "product": "milk-whole",
+        "price": 0.9,
+        "minOrder": 20
+      }
+    ]
+  },
+  {
+    "id": "operator",
+    "role": "operator",
+    "name": "Bwyd Lleol Sir Benfro",
+    "kind": "network",
+    "town": "Haverfordwest",
+    "lat": 51.8,
+    "lon": -4.97,
+    "blurb": {
+      "en": "Network operator: onboarding, models and oversight.",
+      "cy": "Gweithredwr y rhwydwaith: ymuno, modelau a goruchwylio."
+    }
+  }
+]

@@ -1,3 +1,4 @@
+import { parseOrganisations } from '../src/server/organisations';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, DIMENSIONS, capabilities, localStatus, sanitiseConfig } from '../src/shared/models';
 import { offersFor } from '../src/shared/browse';
@@ -81,4 +82,36 @@ describe('seed data', () => {
     expect(d).toBeGreaterThan(40); expect(d).toBeLessThan(80);
   });
   it('addDays crosses month boundaries', () => expect(addDays('2026-10-30', 3)).toBe('2026-11-02'));
+});
+
+describe('organisations.json validation', () => {
+  const products = new Set(['milk-whole', 'veg-leek']);
+  const buyer = { id: 'b1', role: 'buyer', name: 'B', kind: 'hotel', town: 'T', lat: 51.8, lon: -4.9, blurb: { en: 'x' } };
+  const producer = { id: 'p1', role: 'producer', name: 'P', kind: 'farm', town: 'T', lat: 51.9, lon: -4.9, blurb: { en: 'x' },
+    offers: [{ product: 'milk-whole', price: 1, minOrder: 2 }] };
+  const op = { id: 'op', role: 'operator', name: 'Op', kind: 'network', town: 'T', lat: 51.8, lon: -4.9, blurb: { en: 'x' } };
+  const ok = [buyer, producer, op];
+
+  it('accepts a valid file; Welsh blurb falls back to English', () => {
+    const r = parseOrganisations(ok, products);
+    expect(r.orgs).toHaveLength(3);
+    expect(r.orgs[0].blurb.cy).toBe('x');
+    expect(r.listings[0]).toMatchObject({ id: 'p1:milk-whole', pricePerUnit: 1, minOrder: 2 });
+  });
+  it('reports every problem with the entry that caused it', () => {
+    const bad = [{ ...buyer, id: 'Bad Id' }, { ...producer, offers: [{ product: 'nope', price: 1, minOrder: 1 }] }, { ...producer }];
+    expect(() => parseOrganisations(bad, products)).toThrowError(/entry 1.*"id"[\s\S]*unknown product "nope"[\s\S]*duplicate "id"[\s\S]*exactly one operator/);
+  });
+  it('rejects coordinates outside the area, a producer with no offers, and offers on a buyer', () => {
+    expect(() => parseOrganisations([{ ...buyer, lat: 10 }, producer, op], products)).toThrowError(/"lat"/);
+    expect(() => parseOrganisations([buyer, { ...producer, offers: [] }, op], products)).toThrowError(/at least one entry in "offers"/);
+    expect(() => parseOrganisations([{ ...buyer, offers: [] }, producer, op], products)).toThrowError(/only producers/);
+  });
+  it('requires a buyer, a producer and one operator', () => {
+    expect(() => parseOrganisations([producer, op], products)).toThrowError(/at least one buyer/);
+    expect(() => parseOrganisations([buyer, producer, op, { ...op, id: 'op2' }], products)).toThrowError(/exactly one operator \(found 2\)/);
+  });
+  it('the shipped data file is valid', () => {
+    expect(seed.orgs.length).toBeGreaterThanOrEqual(3);
+  });
 });

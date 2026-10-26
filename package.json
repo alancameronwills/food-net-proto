@@ -13,6 +13,7 @@
     "dev:web": "vite",
     "dev": "concurrently -n api,web -c blue,yellow \"npm:dev:api\" \"npm:dev:web\"",
     "typecheck": "tsc --noEmit",
+    "check:data": "tsx src/server/check-data.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
