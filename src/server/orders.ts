@@ -5,7 +5,8 @@ import type { Order, OrderLine, OrderStatus, Organisation, StockState, SupplyWin
 import type { Session, TxItem } from './db';
 import { emit, type EventParams, type EventType } from './events';
 import type { Result } from './producer';
-import { getConfig, getDistances, listCategories, listListings, listProducts } from './store';
+import { deliveryRule } from '../shared/delivery';
+import { getConfig, getDistances, listCategories, listListings, listOrgs, listProducts } from './store';
 
 const fail = (status: 400 | 403 | 404 | 409, error: string): Result<never> => ({ ok: false, status, error });
 const MAX_LINES = 25; // a transaction holds at most 100 items; one order never gets near that
@@ -13,6 +14,9 @@ const RETRIES = 3;
 
 const REASON: Record<Unavailable, string> = {
   not_delivery_day: 'is not delivered on that day',
+  no_route: 'is not delivered to your area by this producer',
+  not_route_day: 'is not on this producer\'s delivery round to your area that day',
+  not_hub_day: 'is not on a hub courier day',
   too_soon: 'needs more notice for that date',
   too_far: 'cannot be ordered that far ahead',
   no_supply: 'has no supply planned that week',
@@ -26,11 +30,12 @@ const winSk = (listingId: string, deliveryDate: string) => windowKey(listingId, 
 
 /** Context shared by the operations below, read fresh on every attempt. */
 async function load(s: Session) {
-  const [config, categories, products, listings, distances] = await Promise.all([
-    getConfig(s), listCategories(s), listProducts(s), listListings(s), getDistances(s),
+  const [config, categories, products, listings, distances, orgs] = await Promise.all([
+    getConfig(s), listCategories(s), listProducts(s), listListings(s), getDistances(s), listOrgs(s),
   ]);
   return {
     config,
+    orgs: new Map(orgs.map((o) => [o.id, o])),
     categories: new Map(categories.map((c) => [c.id, c])),
     products: new Map(products.map((p) => [p.id, p])),
     listings: new Map(listings.map((l) => [l.id, l])),
@@ -141,6 +146,7 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
     const av = availabilityFor({
       config: ctx.config, category, listing, window: w, date: deliveryDate, today,
       driveKm: ctx.distances[actor.id]?.[listing.producerId] ?? Infinity,
+      rule: deliveryRule(ctx.config, category, listing, ctx.orgs.get(listing.producerId), ctx.orgs.get(actor.id)?.area),
     });
     if (av.problem) return fail(409, `${product.name.en} ${REASON[av.problem]}`);
     if (qty > av.orderable) return fail(409, `${product.name.en}: only ${av.orderable} available`);
@@ -160,7 +166,7 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
     const status: OrderStatus = autoConfirm ? 'confirmed' : 'placed';
     const at = nowIso();
     const order: Order = {
-      id: `BL-${1000 + seq}`, groupId, buyerId: actor.id, producerId, deliveryDate, status, stock, lines,
+      id: `BL-${1000 + seq}`, groupId, buyerId: actor.id, producerId, deliveryDate, status, stock, lines, deliveryMode: ctx.config.delivery as Order['deliveryMode'],
       total: Math.round(lines.reduce((n, l) => n + lineTotal(l.unitPrice, l.qty), 0) * 100) / 100,
       note, createdAt: at, history: [{ at, status, by: actor.id }],
     };

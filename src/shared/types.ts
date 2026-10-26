@@ -16,7 +16,14 @@ export type Organisation = {
   verified?: boolean;
   /** Producers only: past delivery record before this session, so reliability scores are meaningful from the start. */
   baseline?: { orders: number; fillRate: number };
+  /** Worked out from the location: which delivery area this organisation is in (see data/areas.json). */
+  area?: string;
+  /** Producers only: weekdays (0 = Sunday) on which they run a delivery round to each area. None given = any category delivery day. */
+  routes?: Record<string, number[]>;
 };
+
+/** A zone producers publish delivery rounds for; every organisation belongs to the nearest one. */
+export type Area = { id: string; name: Bilingual; lat: number; lon: number };
 
 export type CategoryId = 'milk' | 'eggs' | 'bread' | 'veg' | 'meat' | 'fish' | 'cheese';
 
@@ -90,6 +97,8 @@ export type Order = {
   lines: OrderLine[];
   total: number;
   note?: string;
+  /** How it is being delivered, fixed when the order was placed. */
+  deliveryMode?: 'producer' | 'area_days' | 'hub_courier';
   /** Set when the order arises from accepting a bid on a demand request. */
   source?: { requestId: string; bidId: string };
   /** Quantities actually delivered, once delivery is recorded. */

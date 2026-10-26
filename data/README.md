@@ -39,3 +39,15 @@ Producers can also have:
 |---|---|
 | `verified` | `true` shows a "Verified member" badge under the *Verified badges* trust model |
 | `baseline` | `{ "orders": 40, "fillRate": 0.95 }`: the producer's past delivery record. The reliability score blends this with deliveries recorded in the demo |
+
+## Delivery areas and rounds (Phase 6)
+
+`areas.json` lists the delivery areas (id, name in English and Welsh, a centre point). Every organisation belongs to the
+area nearest to its location, so moving a business in `organisations.json` moves it between areas automatically.
+
+Under the *Area delivery days* model a producer's `routes` say which weekdays they deliver to each area:
+
+    "routes": { "teifi": [1, 4], "fishguard": [2, 5] }     // 0 = Sunday ... 6 = Saturday
+
+A producer with no `routes` at all delivers on the product's usual days everywhere; a producer with `routes` but none for
+an area does not deliver there. Under the *Hub courier* model the operator sets the hub days in the Model Lab instead.

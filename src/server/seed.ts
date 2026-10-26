@@ -3,11 +3,14 @@ import type {
   Confidence,
   DriveDistances,
   Listing,
+  Area,
   Organisation,
   Product,
   SupplyWindow,
 } from '../shared/types';
 import organisationsJson from '../../data/organisations.json';
+import areasJson from '../../data/areas.json';
+import { nearestArea } from '../shared/delivery';
 import { addDays, mondayOf } from '../shared/dates';
 import { parseOrganisations } from './organisations';
 
@@ -55,8 +58,10 @@ export const PRODUCTS: Product[] = [
 ];
 
 // Organisations (and each producer's offers) are edited in data/organisations.json.
-const loaded = parseOrganisations(organisationsJson, new Set(PRODUCTS.map((p) => p.id)));
-export const ORGS: Organisation[] = loaded.orgs;
+export const AREAS: Area[] = areasJson as Area[];
+const loaded = parseOrganisations(organisationsJson, new Set(PRODUCTS.map((p) => p.id)), new Set(AREAS.map((a) => a.id)));
+/** Every organisation belongs to the delivery area nearest to it. */
+export const ORGS: Organisation[] = loaded.orgs.map((o) => ({ ...o, area: nearestArea(AREAS, o.lat, o.lon) }));
 export const LISTINGS: Listing[] = loaded.listings;
 
 const BASE_QTY: Record<Category['id'], number> = { milk: 200, bread: 40, eggs: 60, veg: 80, meat: 40, fish: 25, cheese: 30 };
@@ -110,6 +115,7 @@ export function buildDistances(orgs: Organisation[] = ORGS, roadFactor = 1.35): 
 export function buildSeed(today: string) {
   return {
     orgs: ORGS,
+    areas: AREAS,
     categories: CATEGORIES,
     products: PRODUCTS,
     listings: LISTINGS,

@@ -30,10 +30,11 @@ export function Planner({ buyerId, boot, windows, onPick }: {
 
   const grid = useMemo(() => {
     const offers = offersFor(buyerId, boot).filter((o) => o.status !== 'hidden');
-    const byProduct = new Map<string, { product: Product; category: Category; listingIds: Set<string> }>();
+    const byProduct = new Map<string, { product: Product; category: Category; listingIds: Set<string>; rules: { days: number[]; lead: number }[] }>();
     for (const o of offers) {
-      const e = byProduct.get(o.product.id) ?? { product: o.product, category: o.category, listingIds: new Set() };
+      const e = byProduct.get(o.product.id) ?? { product: o.product, category: o.category, listingIds: new Set(), rules: [] };
       e.listingIds.add(o.listing.id);
+      e.rules.push(o.rule);
       byProduct.set(o.product.id, e);
     }
     const win = new Map(windows.map((w) => [`${w.listingId}#${w.start}`, w]));
@@ -64,12 +65,12 @@ export function Planner({ buyerId, boot, windows, onPick }: {
     provisional: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
   };
 
-  /** First day in that week this category can be delivered, respecting notice. */
-  const firstDelivery = (monday: string, category: Category) => {
-    const lead = Math.max(category.leadDays, 1);
+  /** First day in that week on which at least one local producer can deliver this product, respecting notice. */
+  const firstDelivery = (monday: string, rules: { days: number[]; lead: number }[]) => {
     for (let i = 0; i < 7; i++) {
       const d = addDays(monday, i);
-      if (d >= addDays(today, lead) && category.deliveryDays.includes(new Date(d + 'T00:00:00Z').getUTCDay())) return d;
+      const dow = new Date(d + 'T00:00:00Z').getUTCDay();
+      if (rules.some((r) => d >= addDays(today, Math.max(r.lead, 1)) && r.days.includes(dow))) return d;
     }
     return undefined;
   };
@@ -95,7 +96,7 @@ export function Planner({ buyerId, boot, windows, onPick }: {
                   <span className="font-medium">{loc(r.product.name)}</span> <span className="text-xs text-slate-500">({t(`units.${r.product.unit}`)})</span>
                 </td>
                 {r.cells.map((c) => {
-                  const date = c.best ? firstDelivery(c.monday, r.category) : undefined;
+                  const date = c.best ? firstDelivery(c.monday, r.rules) : undefined;
                   return (
                     <td key={c.monday} className="p-1 text-center">
                       {c.best && date && c.best !== 'provisional' ? (

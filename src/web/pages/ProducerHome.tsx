@@ -56,7 +56,7 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
           ? <DemandBoard producerId={me.id} boot={boot} requests={requests} reload={reload} />
           : <p className="text-slate-600">{t('commitmentsSoon')}</p>
       ) : tab === 'orders' ? (
-        <OrdersInbox orders={orders} boot={boot} reload={reload} />
+        <OrdersInbox orders={orders} boot={boot} reload={reload} producerId={me.id} />
       ) : tab === 'stock' ? (
         <div className="space-y-4">
           {mine.length === 0 && <p className="text-slate-600">{t('noListings')}</p>}

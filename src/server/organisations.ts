@@ -4,7 +4,7 @@ import type { Listing, Organisation } from '../shared/types';
  * Parse and validate data/organisations.json. Errors name the offending entry so the
  * file can be edited by hand without reading code.
  */
-export function parseOrganisations(raw: unknown, productIds: Set<string>): { orgs: Organisation[]; listings: Listing[] } {
+export function parseOrganisations(raw: unknown, productIds: Set<string>, areaIds?: Set<string>): { orgs: Organisation[]; listings: Listing[] } {
   const problems: string[] = [];
   if (!Array.isArray(raw)) throw new Error('data/organisations.json must be a list of organisations');
 
@@ -41,10 +41,19 @@ export function parseOrganisations(raw: unknown, productIds: Set<string>): { org
           pricePerUnit: o.price, minOrder: o.minOrder, certifications: Array.isArray(r.certifications) ? r.certifications : [],
         });
       });
+      if (r.routes !== undefined) {
+        if (!r.routes || typeof r.routes !== 'object' || Array.isArray(r.routes)) bad('"routes" must look like { "teifi": [2, 5] } (weekdays, 0 = Sunday)');
+        else {
+          for (const [area, days] of Object.entries(r.routes as Record<string, unknown>)) {
+            if (areaIds && !areaIds.has(area)) bad(`routes: unknown area "${area}" (known: ${[...areaIds].join(', ')})`);
+            else if (!Array.isArray(days) || days.length === 0 || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) bad(`routes.${area} must be a list of weekdays 0-6 (0 = Sunday)`);
+          }
+        }
+      }
       if (r.baseline !== undefined && !(Number.isInteger(r.baseline?.orders) && r.baseline.orders >= 0 && isNum(r.baseline?.fillRate) && r.baseline.fillRate >= 0 && r.baseline.fillRate <= 1)) {
         bad('"baseline" must look like { "orders": 40, "fillRate": 0.95 } (fillRate between 0 and 1)');
       }
-    } else if (r.offers || r.baseline || r.verified) bad('only producers can have "offers", "baseline" or "verified"');
+    } else if (r.offers || r.baseline || r.verified || r.routes) bad('only producers can have "offers", "routes", "baseline" or "verified"');
     if (r.verified !== undefined && typeof r.verified !== 'boolean') bad('"verified" must be true or false');
 
     orgs.push({
@@ -52,6 +61,7 @@ export function parseOrganisations(raw: unknown, productIds: Set<string>): { org
       blurb: { en: r.blurb?.en, cy: isStr(r.blurb?.cy) ? r.blurb.cy : r.blurb?.en },
       ...(r.verified ? { verified: true } : {}),
       ...(r.baseline ? { baseline: { orders: r.baseline.orders, fillRate: r.baseline.fillRate } } : {}),
+      ...(r.routes ? { routes: r.routes } : {}),
     });
   });
 

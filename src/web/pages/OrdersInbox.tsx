@@ -4,9 +4,10 @@ import type { Order } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
 import { loc } from '../i18n';
 import { OrderCard } from './OrderCard';
+import { RunSheet } from './RunSheet';
 
 /** A producer answers new orders here, then works through picking and delivery. */
-export function OrdersInbox({ orders, boot, reload }: { orders: Order[]; boot: Bootstrap; reload: () => void }) {
+export function OrdersInbox({ orders, boot, reload, producerId }: { orders: Order[]; boot: Bootstrap; reload: () => void; producerId?: string }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
   const [declining, setDeclining] = useState<string>();
@@ -107,6 +108,10 @@ export function OrdersInbox({ orders, boot, reload }: { orders: Order[]; boot: B
       {section(t('upcomingOrders'), by('confirmed', 'picked').sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate)))}
       {section(t('completedOrders'), by('delivered', 'short'))}
       {section(t('pastOrders'), by('declined', 'cancelled'))}
+      <section className="space-y-2">
+        <h3 className="text-lg font-semibold text-brand-dark">{t('runSheetTitle')}</h3>
+        <RunSheet orders={orders} boot={boot} producerId={producerId ?? orders[0]?.producerId} />
+      </section>
     </div>
   );
 }

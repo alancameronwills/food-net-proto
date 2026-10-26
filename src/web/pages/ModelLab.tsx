@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { DIMENSIONS, type ModelConfig } from '../../shared/models';
 import type { Persona } from '../../shared/types';
 import { api, ctx, type Bootstrap } from '../api';
+import { WEEKDAYS } from '../../shared/delivery';
 import { loc } from '../i18n';
 
 export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas: Persona[]; reload: () => void }) {
@@ -48,6 +49,21 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
                   <input type="range" min={0} max={100} step={5} value={Math.round(c.forecastPct * 100)}
                     onChange={(e) => change({ forecastPct: Number(e.target.value) / 100 })} className="block w-full accent-[#17357f]" />
                 </label>
+              )}
+              {d.id === 'delivery' && c.delivery === 'hub_courier' && (
+                <div className="mt-2 text-sm" data-testid="hub-days">
+                  <div className="font-medium">{t('hubDaysLabel')}</div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {[1, 2, 3, 4, 5, 6, 0].map((day) => {
+                      const on = c.hubDays.includes(day);
+                      return (
+                        <button key={day} aria-pressed={on} onClick={() => change({ hubDays: on ? c.hubDays.filter((x) => x !== day) : [...c.hubDays, day] })}
+                          className={`rounded border px-2 py-0.5 ${on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white'}`}>{WEEKDAYS.en[day]}</button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">{t('hubDaysHint', { n: 2 })}</p>
+                </div>
               )}
               {d.id === 'localRange' && c.localRange === 'flat' && (
                 <label className="mt-2 block text-sm">{t('flatRadius')}: <b>{c.flatRadiusKm}</b>

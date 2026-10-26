@@ -1,6 +1,8 @@
 import { addDays, isIsoDate, mondayOf, todayIso } from '../shared/dates';
 import { localStatus } from '../shared/models';
+import { deliveryRule, ruleProblem, type DeliveryProblem } from '../shared/delivery';
 import { deliveryProblem } from '../shared/orders';
+import { listOrgs } from './store';
 import type { Bid, Category, DemandRequest, Listing, Order, Organisation, RequestView, SupplyWindow } from '../shared/types';
 import type { Session, TxItem } from './db';
 import { emit, type EventParams, type EventType } from './events';
@@ -31,6 +33,17 @@ function inRange(ctx: Ctx, buyerId: string, producerId: string, category: Catego
 }
 
 const remaining = (r: DemandRequest) => r.qty - r.filledQty;
+
+function requestProblemText(problem: DeliveryProblem, product: string, lead: number): string {
+  switch (problem) {
+    case 'too_soon': return `Producers need at least ${lead} day(s) notice for ${product}`;
+    case 'too_far': return 'That date is too far ahead';
+    case 'not_hub_day': return 'The hub courier does not deliver on that day';
+    case 'not_route_day': return 'This producer does not deliver to that buyer\'s area on that day';
+    case 'no_route': return 'This producer does not deliver to that buyer\'s area';
+    default: return `${product} is not delivered on that day`;
+  }
+}
 const poolKey = (r: Pick<DemandRequest, 'productId' | 'deliveryDate'>) => `${r.productId}#${mondayOf(r.deliveryDate)}`;
 
 async function say(s: Session, type: EventType, r: DemandRequest, extra: EventParams, to: string[]) {
@@ -88,12 +101,10 @@ export async function createRequest(s: Session, actor: Organisation | undefined,
   if (!product || !category) return fail(400, 'Unknown product');
   if (!isQty(body.qty)) return fail(400, 'qty must be a whole number of at least 1');
   if (!isIsoDate(body.deliveryDate)) return fail(400, 'deliveryDate required (YYYY-MM-DD)');
-  const problem = deliveryProblem(category, { leadDays: undefined } as Listing, body.deliveryDate, todayIso());
-  if (problem) {
-    return fail(400, problem === 'too_soon' ? `Producers need at least ${category.leadDays} day(s) notice for ${product.name.en}`
-      : problem === 'too_far' ? 'That date is too far ahead'
-        : `${product.name.en} is not delivered on that day`);
-  }
+  // The date must at least be deliverable in principle: the hub courier's days under the hub model, else the product's usual days.
+  const rule = ctx.config.delivery === 'hub_courier' ? deliveryRule(ctx.config, category) : undefined;
+  const problem = rule ? ruleProblem(rule, body.deliveryDate, todayIso()) : deliveryProblem(category, { leadDays: undefined } as Listing, body.deliveryDate, todayIso());
+  if (problem) return fail(400, requestProblemText(problem, product.name.en, rule?.lead ?? category.leadDays));
   if (body.targetPrice !== undefined && body.targetPrice !== null && !isMoney(body.targetPrice)) return fail(400, 'targetPrice must be a positive number');
   const targetPrice = body.targetPrice ?? undefined;
   if (ctx.config.speculative === 'first_accept' && targetPrice === undefined) return fail(400, 'First-to-accept requests need a price you will pay');
@@ -153,12 +164,19 @@ export async function placeBid(s: Session, actor: Organisation | undefined, id: 
   const category = ctx.categories.get(product.category)!;
   if (first.status !== 'open') return fail(409, `This request is already ${first.status}`);
   if (!inRange(ctx, first.buyerId, actor.id, category)) return fail(403, 'This buyer is outside your local range');
+  const orgs = new Map((await listOrgs(s)).map((o) => [o.id, o]));
+  const canDeliver = (r: DemandRequest) => {
+    const rule = deliveryRule(ctx.config, category, undefined, actor, orgs.get(r.buyerId)?.area);
+    return ruleProblem(rule, r.deliveryDate, todayIso());
+  };
+  const blocked = canDeliver(first);
+  if (blocked) return fail(400, requestProblemText(blocked, product.name.en, category.leadDays));
 
   // Which requests does this bid apply to?
   let targets = [first];
   if (ctx.config.speculative === 'pooled') {
     targets = (await s.list<DemandRequest>('REQUEST'))
-      .filter((r) => r.status === 'open' && poolKey(r) === poolKey(first) && inRange(ctx, r.buyerId, actor.id, category))
+      .filter((r) => r.status === 'open' && poolKey(r) === poolKey(first) && inRange(ctx, r.buyerId, actor.id, category) && !canDeliver(r))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   } else if (body.qty > remaining(first)) {
     return fail(400, `You can offer at most ${remaining(first)} (what is still wanted)`);
@@ -243,7 +261,7 @@ async function fulfil(
     const at = new Date().toISOString();
     const order: Order = {
       id: `BL-${1000 + seq}`, groupId: `g-${requestId}-${bid.id}`, buyerId: r.buyerId, producerId, deliveryDate: r.deliveryDate,
-      status: 'confirmed', stock: 'reserved', lines: [{ listingId, productId: r.productId, qty, unitPrice: bid.price }],
+      status: 'confirmed', stock: 'reserved', deliveryMode: ctx.config.delivery as Order['deliveryMode'], lines: [{ listingId, productId: r.productId, qty, unitPrice: bid.price }],
       total: Math.round(qty * bid.price * 100) / 100, note: r.note, source: { requestId, bidId: bid.id }, createdAt: at,
       history: [{ at, status: 'confirmed', by }],
     };

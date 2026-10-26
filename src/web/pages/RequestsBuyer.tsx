@@ -38,7 +38,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
     if (!product) return 0;
     const byWindow = new Map(windows.map((w) => [`${w.listingId}#${w.start}`, w]));
     return offersFor(buyerId, boot).filter((o) => o.product.id === product.id && o.status !== 'hidden'
-      && availabilityFor({ config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(o.listing.id, date)), date, today: todayIso(), driveKm: o.driveKm }).orderable >= Math.max(1, Number(qty) || 1)).length;
+      && availabilityFor({ config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(o.listing.id, date)), date, today: todayIso(), driveKm: o.driveKm, rule: o.rule }).orderable >= Math.max(1, Number(qty) || 1)).length;
   }, [product, buyerId, boot, windows, date, qty]);
 
   const submit = async (e: React.FormEvent) => {
@@ -53,7 +53,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
   const byCategory = boot.categories.map((c) => ({ c, items: boot.products.filter((p) => p.category === c.id) }));
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[22rem_1fr]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
       <form onSubmit={submit} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-testid="request-form">
         <h2 className="text-lg font-bold text-brand">{t('reqTitle')}</h2>
         <p className="text-sm text-slate-600">{t(model === 'first_accept' ? 'reqIntroFirst' : 'reqIntro')} {model === 'pooled' && t('reqIntroPooled')}</p>

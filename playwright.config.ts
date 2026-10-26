@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
+  expect: { timeout: 10_000 }, // the suite runs many browsers at once; give polled screens room
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {

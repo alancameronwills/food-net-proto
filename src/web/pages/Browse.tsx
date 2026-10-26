@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { offersFor } from '../../shared/browse';
 import { addDays, todayIso } from '../../shared/dates';
+import { dayNames, WEEKDAYS } from '../../shared/delivery';
 import { availabilityFor, windowKey, type Unavailable } from '../../shared/orders';
 import { capabilities } from '../../shared/models';
 import type { SupplyWindow } from '../../shared/types';
@@ -33,9 +34,22 @@ export function Browse({ buyerId, boot, windows, date, onDate, qtyInCart, onAdd,
       o,
       av: availabilityFor({
         config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(o.listing.id, date)),
-        date, today, driveKm: o.driveKm,
+        date, today, driveKm: o.driveKm, rule: o.rule,
       }),
     })), [buyerId, boot, byWindow, date, today]);
+
+  // How much could be ordered on each of the next two weeks of days: shows at a glance when this buyer can be served
+  const strip = useMemo(() => {
+    const offers = offersFor(buyerId, boot).filter((o) => o.status !== 'hidden');
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = addDays(today, i + 1);
+      const n = offers.filter((o) => availabilityFor({
+        config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(o.listing.id, d)), date: d, today, driveKm: o.driveKm, rule: o.rule,
+      }).orderable > 0).length;
+      return { d, n };
+    });
+  }, [buyerId, boot, byWindow, today]);
+  const lang = i18n.language === 'cy' ? 'cy' : 'en';
 
   const q = search.trim().toLowerCase();
   const shown = rows
@@ -61,6 +75,26 @@ export function Browse({ buyerId, boot, windows, date, onDate, qtyInCart, onAdd,
         <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} />{t('onlyAvailable')}</label>
       </div>
 
+      <div className="mb-4" data-testid="day-strip">
+        <div className="mb-1 flex flex-wrap items-baseline gap-x-3 text-sm text-slate-600">
+          <span className="font-medium">{t('pickDay')}</span>
+          {boot.config.delivery === 'hub_courier' && <span data-testid="hub-info">{t('hubInfo', { days: dayNames(boot.config.hubDays, lang), n: 2 })}</span>}
+          {boot.config.delivery !== 'hub_courier' && <span>{t(`deliveryModeNote_${boot.config.delivery}`, { days: '' })}</span>}
+        </div>
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {strip.map(({ d, n }) => {
+            const dt = new Date(d + 'T00:00:00Z');
+            return (
+              <button key={d} data-testid={`day-${d}`} data-count={n} onClick={() => onDate(d)} aria-pressed={d === date}
+                className={`min-w-16 shrink-0 rounded border px-2 py-1 text-center text-xs ${d === date ? 'border-brand bg-brand text-white' : n > 0 ? 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100' : 'border-slate-200 bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+                <div className="font-semibold">{WEEKDAYS[lang][dt.getUTCDay()]} {dt.getUTCDate()}</div>
+                <div>{n > 0 ? t('dayCount', { n }) : '–'}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {shown.length === 0 && <p className="text-slate-600">{t('noMatches')}</p>}
       <div className="grid gap-3 lg:grid-cols-2">
         {shown.map(({ o, av }) => {
@@ -79,6 +113,7 @@ export function Browse({ buyerId, boot, windows, date, onDate, qtyInCart, onAdd,
               <div className="text-sm">{o.producer.name} · {o.producer.town} · {t('km', { n: o.driveKm })}
                 {av.farWarning && <span className="ml-2 rounded bg-gold-light px-1.5 text-xs font-semibold text-amber-900">{t('farWarning')}</span>}
                 <span className="ml-2"><TrustChip producerId={o.producer.id} boot={boot} /></span>
+                {o.rule.mode === 'area_days' && o.rule.days.length > 0 && <div className="text-xs text-slate-600" data-testid="route-info">{t('routeInfo', { days: dayNames(o.rule.days, lang) })}</div>}
               </div>
               <div className="mt-1 text-sm">£{o.listing.pricePerUnit.toFixed(2)} {t('perUnit', { unit: t(`units.${o.product.unit}`) })} · {t('minShort', { n: o.listing.minOrder })}
                 {tiers?.map((x) => <span key={x.minQty} className="ml-2 text-brand">{t('tierBreak', { qty: x.minQty, price: x.price.toFixed(2) })}</span>)}

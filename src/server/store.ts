@@ -1,10 +1,10 @@
 import { DEFAULT_CONFIG, sanitiseConfig, type ModelConfig } from '../shared/models';
-import type { DriveDistances, Listing, Organisation, SupplyWindow, Category, Product } from '../shared/types';
+import type { Area, DriveDistances, Listing, Organisation, SupplyWindow, Category, Product } from '../shared/types';
 import { ensureTable, session, type Session } from './db';
 import { buildSeed, isoDate } from './seed';
 
 /** Item kinds that make up a demo session; `reset` wipes and reseeds all of them. */
-export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF', 'REQUEST'];
+export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF', 'REQUEST', 'AREA'];
 
 export async function resetSession(id: string, today = isoDate(new Date())): Promise<void> {
   await ensureTable();
@@ -12,6 +12,7 @@ export async function resetSession(id: string, today = isoDate(new Date())): Pro
   await s.clear(KINDS);
   const seed = buildSeed(today);
   await s.putMany('ORG', seed.orgs.map((o) => ({ sk: o.id, data: o })));
+  await s.putMany('AREA', seed.areas.map((a) => ({ sk: a.id, data: a })));
   await s.putMany('CATEGORY', seed.categories.map((c) => ({ sk: c.id, data: c })));
   await s.putMany('PRODUCT', seed.products.map((p) => ({ sk: p.id, data: p })));
   await s.putMany('LISTING', seed.listings.map((l) => ({ sk: l.id, data: l })));
@@ -57,6 +58,7 @@ export async function updateConfig(s: Session, patch: Record<string, unknown>): 
 }
 
 export const listOrgs = (s: Session) => s.list<Organisation>('ORG');
+export const listAreas = (s: Session) => s.list<Area>('AREA');
 export const listCategories = (s: Session) => s.list<Category>('CATEGORY');
 export const listProducts = (s: Session) => s.list<Product>('PRODUCT');
 export const listListings = (s: Session) => s.list<Listing>('LISTING');

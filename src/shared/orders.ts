@@ -1,4 +1,5 @@
 import { addDays, mondayOf } from './dates';
+import { MAX_DAYS_AHEAD, leadDaysFor, ruleProblem, type DeliveryProblem, type DeliveryRule } from './delivery';
 import { capabilities, localStatus, type ModelConfig } from './models';
 import type { Category, Listing, SupplyWindow } from './types';
 
@@ -20,17 +21,11 @@ export function unitPriceFor(config: ModelConfig, listing: Listing, qty: number)
 
 export const lineTotal = (unitPrice: number, qty: number) => Math.round(unitPrice * qty * 100) / 100;
 
-export const MAX_DAYS_AHEAD = 180;
-export const leadDaysFor = (category: Category, listing: Listing) => listing.leadDays ?? category.leadDays;
+export { MAX_DAYS_AHEAD, leadDaysFor };
 
-export type DeliveryProblem = 'not_delivery_day' | 'too_soon' | 'too_far';
-
-/** Can this listing's category be delivered on `date`, given today's date and the notice the producer needs? */
+/** Can this listing's category be delivered on `date` if the producer delivers by their own round? (No area or hub rules.) */
 export function deliveryProblem(category: Category, listing: Listing, date: string, today: string): DeliveryProblem | null {
-  if (date < addDays(today, leadDaysFor(category, listing))) return 'too_soon';
-  if (date > addDays(today, MAX_DAYS_AHEAD)) return 'too_far';
-  const dow = new Date(date + 'T00:00:00Z').getUTCDay();
-  return category.deliveryDays.includes(dow) ? null : 'not_delivery_day';
+  return ruleProblem({ mode: 'producer', days: category.deliveryDays, lead: leadDaysFor(category, listing) }, date, today);
 }
 
 export type Unavailable =
@@ -49,11 +44,13 @@ export type Availability = {
 export function availabilityFor(args: {
   config: ModelConfig; category: Category; listing: Listing; window?: SupplyWindow;
   date: string; today: string; driveKm: number;
+  /** Delivery rule for this producer and buyer under the active delivery model; defaults to the category's usual days. */
+  rule?: DeliveryRule;
 }): Availability {
   const { config, category, listing, window: w, date, today, driveKm } = args;
   const range = localStatus(config, category.maxDriveKm, driveKm);
   if (range === 'hidden') return { orderable: 0, problem: 'out_of_range' };
-  const d = deliveryProblem(category, listing, date, today);
+  const d = args.rule ? ruleProblem(args.rule, date, today) : deliveryProblem(category, listing, date, today);
   if (d) return { orderable: 0, problem: d };
   if (!w) return { orderable: 0, problem: 'no_supply' };
   const base = { confidence: w.confidence, farWarning: range === 'warn' };

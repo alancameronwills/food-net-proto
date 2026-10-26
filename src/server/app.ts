@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { session, type Session } from './db';
 import {
-  ensureSeeded, getConfig, getDistances, listCategories, listListings, listOrgs, listProducts,
+  ensureSeeded, getConfig, getDistances, listAreas, listCategories, listListings, listOrgs, listProducts,
   listWindows, resetSession, updateConfig,
 } from './store';
 import type { Organisation, Persona } from '../shared/types';
@@ -51,11 +51,11 @@ app.get('/me', (c) => {
 // Everything the client needs to render browse screens; small enough to fetch whole.
 app.get('/bootstrap', async (c) => {
   const s = c.get('s');
-  const [config, orgs, categories, products, listings, distances] = await Promise.all([
-    getConfig(s), listOrgs(s), listCategories(s), listProducts(s), listListings(s), getDistances(s),
+  const [config, orgs, categories, products, listings, distances, areas] = await Promise.all([
+    getConfig(s), listOrgs(s), listCategories(s), listProducts(s), listListings(s), getDistances(s), listAreas(s),
   ]);
   const reliability = reliabilityFor(orgs, await s.list('ORDER'));
-  return c.json({ config, orgs, categories, products, listings, distances, reliability });
+  return c.json({ config, orgs, categories, products, listings, distances, reliability, areas });
 });
 
 app.get('/windows', async (c) => c.json(await listWindows(c.get('s'))));

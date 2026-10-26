@@ -1,0 +1,26 @@
+[
+  {
+    "id": "fishguard",
+    "name": { "en": "Fishguard & Preseli coast", "cy": "Abergwaun ac arfordir Preseli" },
+    "lat": 52.0,
+    "lon": -4.98
+  },
+  {
+    "id": "newport",
+    "name": { "en": "Newport & Nevern valley", "cy": "Trefdraeth a Dyffryn Nyfer" },
+    "lat": 52.02,
+    "lon": -4.84
+  },
+  {
+    "id": "teifi",
+    "name": { "en": "Cardigan & Teifi estuary", "cy": "Aberteifi ac aber Teifi" },
+    "lat": 52.08,
+    "lon": -4.66
+  },
+  {
+    "id": "upper-teifi",
+    "name": { "en": "Upper Teifi valley", "cy": "Dyffryn Teifi uchaf" },
+    "lat": 52.04,
+    "lon": -4.47
+  }
+]

@@ -98,6 +98,13 @@ const en = {
   poolBidNote: 'Pooled demand: one bid is shared across {{n}} requests for this product and week, oldest first.', takeIt: 'Accept at £{{price}} for all {{qty}}',
   decidedHeading: 'Decided', outcomeWon: 'You won this: order {{id}}', outcomeLost: 'Not chosen', outcomeClosed: 'Request withdrawn', outcomePending: 'Bid placed',
   metricRequests: 'Open requests', requestsHeading: 'Demand requests', commitmentsSoon: 'Standing orders for the forward-commitment model are not built yet.',
+  why_no_route: 'This producer does not deliver to your area', why_not_route_day: 'Not on this producer’s round to your area that day', why_not_hub_day: 'Not a hub courier day',
+  routeInfo: 'Delivers to your area: {{days}}', hubInfo: 'Hub courier delivers on {{days}} (needs {{n}} days’ notice)', pickDay: 'Pick a delivery day', dayCount: '{{n}} to order',
+  by_producer: 'Delivered by the producer', by_area_days: 'Delivered on the producer’s round', by_hub_courier: 'Delivered by the hub courier',
+  deliveryModeNote_producer: 'Each producer delivers its own orders.', deliveryModeNote_area_days: 'Producers deliver on their published rounds for your area.', deliveryModeNote_hub_courier: 'The hub courier delivers on {{days}}.',
+  runSheetTitle: 'Delivery run sheet', runSheetNone: 'Nothing to deliver yet. Confirmed orders appear here by date.', runStopArea: 'Area', hubCollects: 'Collected by the hub courier the day before',
+  runsTab: 'Delivery runs', runsIntro: 'Everything confirmed and still to deliver, by date and buyer.', dropsSeparate: '{{n}} drops if every producer delivers separately', dropsHub: '{{n}} drops with one round per buyer',
+  hubDaysLabel: 'Hub courier days', hubDaysHint: 'Days the hub courier makes deliveries; orders need {{n}} days’ notice.', fromProducer: 'from {{name}}', dayCol: 'Day',
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
 };
 const cy: typeof en = {
@@ -195,6 +202,13 @@ const cy: typeof en = {
   poolBidNote: 'Galw cyfun: mae un cynnig yn cael ei rannu ar draws {{n}} cais am y cynnyrch a’r wythnos hon, yr hynaf yn gyntaf.', takeIt: 'Derbyn am £{{price}} am bob {{qty}}',
   decidedHeading: 'Wedi’u penderfynu', outcomeWon: 'Fe enillwch chi hwn: archeb {{id}}', outcomeLost: 'Heb ei ddewis', outcomeClosed: 'Cais wedi’i dynnu’n ôl', outcomePending: 'Cynnig wedi’i osod',
   metricRequests: 'Ceisiadau agored', requestsHeading: 'Ceisiadau galw', commitmentsSoon: 'Nid yw archebion sefydlog ar gyfer y model ymrwymiad ymlaen llaw wedi’u hadeiladu eto.',
+  why_no_route: 'Nid yw’r cynhyrchydd hwn yn dosbarthu i’ch ardal', why_not_route_day: 'Ddim ar rownd y cynhyrchydd hwn i’ch ardal ar y diwrnod hwnnw', why_not_hub_day: 'Ddim yn ddiwrnod negesydd y ganolfan',
+  routeInfo: 'Yn dosbarthu i’ch ardal: {{days}}', hubInfo: 'Mae negesydd y ganolfan yn dosbarthu ar {{days}} (angen {{n}} diwrnod o rybudd)', pickDay: 'Dewiswch ddiwrnod dosbarthu', dayCount: '{{n}} i’w harchebu',
+  by_producer: 'Wedi’i ddosbarthu gan y cynhyrchydd', by_area_days: 'Wedi’i ddosbarthu ar rownd y cynhyrchydd', by_hub_courier: 'Wedi’i ddosbarthu gan negesydd y ganolfan',
+  deliveryModeNote_producer: 'Mae pob cynhyrchydd yn dosbarthu ei archebion ei hun.', deliveryModeNote_area_days: 'Mae cynhyrchwyr yn dosbarthu ar eu rowndiau cyhoeddedig i’ch ardal.', deliveryModeNote_hub_courier: 'Mae negesydd y ganolfan yn dosbarthu ar {{days}}.',
+  runSheetTitle: 'Taflen rownd ddosbarthu', runSheetNone: 'Dim i’w ddosbarthu eto. Mae archebion wedi’u cadarnhau yn ymddangos yma yn ôl dyddiad.', runStopArea: 'Ardal', hubCollects: 'Wedi’i gasglu gan negesydd y ganolfan y diwrnod cynt',
+  runsTab: 'Rowndiau dosbarthu', runsIntro: 'Popeth sydd wedi’i gadarnhau ac i’w ddosbarthu o hyd, yn ôl dyddiad a phrynwr.', dropsSeparate: '{{n}} arhosiad os yw pob cynhyrchydd yn dosbarthu ar wahân', dropsHub: '{{n}} arhosiad gydag un rownd i bob prynwr',
+  hubDaysLabel: 'Diwrnodau negesydd y ganolfan', hubDaysHint: 'Diwrnodau pan fydd negesydd y ganolfan yn dosbarthu; mae archebion angen {{n}} diwrnod o rybudd.', fromProducer: 'gan {{name}}', dayCol: 'Diwrnod',
   units: { litre: 'litr', kg: 'kg', dozen: 'dwsin', loaf: 'torth', each: 'yr un', crate: 'cawell' },
 };
 

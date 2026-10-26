@@ -6,6 +6,7 @@ import { capabilities } from '../../shared/models';
 import { availabilityFor, lineTotal, unitPriceFor, windowKey } from '../../shared/orders';
 import type { Order, SupplyWindow } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
+import { dayNames } from '../../shared/delivery';
 import { loc } from '../i18n';
 import { longDate } from './Browse';
 
@@ -29,7 +30,7 @@ export function CartPanel({ buyerId, boot, windows, date, qty, setQty, keepOnly,
   const lines = Object.entries(qty).flatMap(([id, n]) => {
     const o = offers.get(id);
     if (!o) return [];
-    const av = availabilityFor({ config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(id, date)), date, today, driveKm: o.driveKm });
+    const av = availabilityFor({ config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(id, date)), date, today, driveKm: o.driveKm, rule: o.rule });
     const unit = unitPriceFor(boot.config, o.listing, n);
     const problem = av.problem ? t(`why_${av.problem}`) : n > av.orderable ? t('onlyN', { n: av.orderable }) : n < o.listing.minOrder ? t('minShort', { n: o.listing.minOrder }) : '';
     return [{ id, n, o, unit, problem, total: lineTotal(unit, n) }];
@@ -98,6 +99,7 @@ export function CartPanel({ buyerId, boot, windows, date, qty, setQty, keepOnly,
           <ul className="mt-1 text-xs text-slate-600">
             <li>{caps.consolidatedInvoice ? t('invoiceOne') : t('invoicesSeparate', { n: producers.length })}</li>
             <li>{caps.consolidatedDelivery ? t('deliveryOne') : t('deliveriesSeparate', { n: producers.length })}</li>
+            <li data-testid="cart-delivery-mode">{t(`deliveryModeNote_${boot.config.delivery}`, { days: dayNames(boot.config.hubDays, i18n.language === 'cy' ? 'cy' : 'en') })}</li>
           </ul>
           <label className="mt-3 block text-sm">{t('noteLabel')}
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={300} className="mt-1 w-full rounded border border-slate-300 p-1" />

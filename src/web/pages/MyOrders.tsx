@@ -33,7 +33,7 @@ export function MyOrders({ buyerId, orders, boot, windows, reload, onAlternative
     return offersFor(buyerId, boot)
       .filter((x) => x.product.id === productId && x.listing.id !== listingId && x.status !== 'hidden')
       .map((x) => ({ x, av: availabilityFor({ config: boot.config, category: x.category, listing: x.listing, window: byWindow.get(windowKey(x.listing.id, o.deliveryDate)),
-        date: o.deliveryDate, today: todayIso(), driveKm: x.driveKm }) }))
+        date: o.deliveryDate, today: todayIso(), driveKm: x.driveKm, rule: x.rule }) }))
       .filter(({ x, av }) => av.orderable >= Math.max(shortBy, x.listing.minOrder));
   };
 

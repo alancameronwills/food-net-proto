@@ -136,6 +136,8 @@ export type ModelConfig = {
   forecastPct: number;
   /** Radius in km used by the `flat` local range option. */
   flatRadiusKm: number;
+  /** Weekdays (0 = Sunday) on which the hub courier makes deliveries. */
+  hubDays: number[];
 };
 
 export const DEFAULT_CONFIG: ModelConfig = {
@@ -150,6 +152,7 @@ export const DEFAULT_CONFIG: ModelConfig = {
   trust: 'score',
   forecastPct: 0.7,
   flatRadiusKm: 50,
+  hubDays: [2, 4, 6],
 };
 
 /** Validate an untrusted partial config against the dimension table. */
@@ -166,6 +169,10 @@ export function sanitiseConfig(input: Record<string, unknown>, base: ModelConfig
   }
   if (typeof input.flatRadiusKm === 'number' && input.flatRadiusKm >= 1 && input.flatRadiusKm <= 500) {
     out.flatRadiusKm = input.flatRadiusKm;
+  }
+  if (Array.isArray(input.hubDays)) {
+    const days = [...new Set(input.hubDays.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+    if (days.length > 0) out.hubDays = days;
   }
   return out;
 }
