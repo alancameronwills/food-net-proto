@@ -46,6 +46,8 @@ export type Listing = {
   pricePerUnit: number; // GBP
   minOrder: number;
   leadDays?: number; // overrides category default
+  /** Volume tiers (used when the pricing model is `tiers`): order >= minQty pays `price` per unit. */
+  tiers?: { minQty: number; price: number }[];
   certifications: string[];
 };
 

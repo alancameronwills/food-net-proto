@@ -1,46 +1,61 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Confidence, Persona } from '../../shared/types';
+import { orderableQty } from '../../shared/browse';
+import { addDays, mondayOf, todayIso } from '../../shared/dates';
+import type { Persona } from '../../shared/types';
 import { useWindows, type Bootstrap } from '../api';
 import { loc } from '../i18n';
+import { ListingsEditor } from './ListingsEditor';
+import { StockCard } from './StockEditor';
 
-const BADGE: Record<Confidence, string> = {
-  in_stock: 'bg-emerald-100 text-emerald-800',
-  forecast: 'bg-gold-light text-amber-800',
-  provisional: 'bg-slate-200 text-slate-700',
-};
-const LABEL: Record<Confidence, string> = { in_stock: 'inStock', forecast: 'forecast', provisional: 'provisional' };
-
-export function ProducerHome({ me, boot }: { me: Persona; boot: Bootstrap }) {
+export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Bootstrap; reloadBoot: () => void }) {
   const { t } = useTranslation();
-  const { data: windows } = useWindows();
+  const [tab, setTab] = useState<'stock' | 'listings'>('stock');
+  const { data: windows = [], reload: reloadWindows } = useWindows();
+  const reload = () => { reloadBoot(); reloadWindows(); };
+
   const products = new Map(boot.products.map((p) => [p.id, p]));
   const mine = boot.listings.filter((l) => l.producerId === me.id);
+  const mineIds = new Set(mine.map((l) => l.id));
+  const myWindows = windows.filter((w) => mineIds.has(w.listingId));
+
+  // Summary tiles. Quantities are in different units (litres, kg, dozen), so count products and weeks instead.
+  const monday = mondayOf(todayIso());
+  const soon = myWindows.filter((w) => w.start >= monday && w.start < addDays(monday, 28));
+  const orderableProducts = mine.filter((l) => soon.some((w) => w.listingId === l.id && orderableQty(boot.config, w) > 0)).length;
+  const weeksWithOrders = myWindows.filter((w) => w.qtyReserved > 0).length;
+
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold text-brand">{t('yourListings')}</h1>
-      <div className="space-y-4">
-        {mine.map((l) => {
-          const p = products.get(l.productId)!;
-          const ws = (windows ?? []).filter((w) => w.listingId === l.id).sort((a, b) => a.start.localeCompare(b.start));
-          return (
-            <section key={l.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-baseline gap-3">
-                <h2 className="text-lg font-semibold">{loc(p.name)}</h2>
-                <span className="text-slate-500">£{l.pricePerUnit.toFixed(2)} {t('perUnit', { unit: t(`units.${p.unit}`) })}</span>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                {ws.map((w) => (
-                  <div key={w.start} className="rounded border border-slate-200 p-2 text-sm">
-                    <div className="text-xs text-slate-500">{t('week')} {w.start.slice(5)}</div>
-                    <div className="text-lg font-semibold">{w.qtyTotal - w.qtyReserved}<span className="text-sm font-normal text-slate-500"> / {w.qtyTotal}</span></div>
-                    <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${BADGE[w.confidence]}`}>{t(LABEL[w.confidence])}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          );
-        })}
+      <div className="mb-4 grid grid-cols-3 gap-3">
+        {([[t('summaryListings'), mine.length], [t('summaryNext4'), `${orderableProducts} / ${mine.length}`], [t('summaryReserved'), weeksWithOrders]] as const).map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="text-2xl font-bold text-brand">{value}</div>
+            <div className="text-xs text-slate-600">{label}</div>
+          </div>
+        ))}
       </div>
+
+      <div role="tablist" className="mb-4 flex gap-2 border-b-2 border-gold">
+        {(['stock', 'listings'] as const).map((k) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            className={`rounded-t px-4 py-2 font-semibold ${tab === k ? 'bg-brand text-white' : 'text-brand hover:bg-brand-light'}`}>
+            {t(k === 'stock' ? 'tabStock' : 'tabListings')}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'stock' ? (
+        <div className="space-y-4">
+          {mine.length === 0 && <p className="text-slate-600">{t('noListings')}</p>}
+          {mine.map((l) => (
+            <StockCard key={l.id} listing={l} product={products.get(l.productId)!} config={boot.config} reload={reload}
+              windows={myWindows.filter((w) => w.listingId === l.id)} />
+          ))}
+        </div>
+      ) : (
+        <ListingsEditor producerId={me.id} boot={boot} reload={reload} />
+      )}
     </div>
   );
 }

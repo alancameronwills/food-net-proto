@@ -1,6 +1,6 @@
 import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, BatchWriteCommand, DeleteCommand,
+  DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, BatchWriteCommand, DeleteCommand, UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 
 export const TABLE = process.env.TABLE_NAME ?? 'bwyd-lleol';
@@ -78,6 +78,34 @@ export function session(id: string) {
         throw e;
       }
     },
+    /** Create an item only if it doesn't exist; returns false if it already did. */
+    async create(kind: string, sk: string, data: object): Promise<boolean> {
+      return condOk(() => doc.send(new PutCommand({
+        TableName: TABLE, Item: { pk: P(kind), sk, ...data }, ConditionExpression: 'attribute_not_exists(pk)',
+      })));
+    },
+    /** SET fields on an existing item if `condition` holds (attribute names as #name, values as :value). */
+    async updateIf(kind: string, sk: string, set: Record<string, unknown>, condition = 'attribute_exists(pk)',
+      values: Record<string, unknown> = {}): Promise<boolean> {
+      const keys = Object.keys(set);
+      return condOk(() => doc.send(new UpdateCommand({
+        TableName: TABLE, Key: { pk: P(kind), sk },
+        UpdateExpression: 'SET ' + keys.map((k) => `#s_${k} = :s_${k}`).join(', '),
+        ConditionExpression: condition,
+        ExpressionAttributeNames: {
+          ...Object.fromEntries(keys.map((k) => [`#s_${k}`, k])),
+          ...Object.fromEntries([...condition.matchAll(/#(\w+)/g)].map((m) => [`#${m[1]}`, m[1]])),
+        },
+        ExpressionAttributeValues: { ...Object.fromEntries(keys.map((k) => [`:s_${k}`, set[k]])), ...values },
+      })));
+    },
+    /** Delete an item if `condition` holds; returns whether it was deleted. */
+    async removeIf(kind: string, sk: string, condition: string, names: Record<string, string>, values: Record<string, unknown>) {
+      return condOk(() => doc.send(new DeleteCommand({
+        TableName: TABLE, Key: { pk: P(kind), sk }, ConditionExpression: condition,
+        ExpressionAttributeNames: names, ExpressionAttributeValues: values,
+      })));
+    },
     async remove(kind: string, sk: string) {
       await doc.send(new DeleteCommand({ TableName: TABLE, Key: { pk: P(kind), sk } }));
     },
@@ -100,6 +128,16 @@ export function session(id: string) {
   };
 }
 export type Session = ReturnType<typeof session>;
+
+async function condOk(f: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await f();
+    return true;
+  } catch (e) {
+    if ((e as Error).name === 'ConditionalCheckFailedException') return false;
+    throw e;
+  }
+}
 
 async function batch(requests: object[]) {
   for (let i = 0; i < requests.length; i += 25) {

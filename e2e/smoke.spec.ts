@@ -36,7 +36,7 @@ test('choosing a buyer shows local suppliers with distances', async ({ page }) =
 
 test('direct role link opens that role (shareable links for Zoom role-play)', async ({ page }) => {
   await page.goto(`/home?s=${newSession()}&as=dyfed-dairy`);
-  await expect(page.getByRole('heading', { name: 'Your listings' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Stock & forecast' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Whole milk' })).toBeVisible();
 });
 

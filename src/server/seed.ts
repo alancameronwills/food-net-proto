@@ -8,6 +8,7 @@ import type {
   SupplyWindow,
 } from '../shared/types';
 import organisationsJson from '../../data/organisations.json';
+import { addDays, mondayOf } from '../shared/dates';
 import { parseOrganisations } from './organisations';
 
 /** Deterministic demo data, with all dates relative to `today`. */
@@ -66,12 +67,7 @@ function hash(s: string): number {
   return h;
 }
 
-export const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
-export const addDays = (iso: string, n: number): string => {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + n);
-  return isoDate(d);
-};
+export { isoDate, addDays } from '../shared/dates';
 
 const WEEK_CONFIDENCE: Confidence[] = ['in_stock', 'in_stock', 'forecast', 'forecast', 'provisional', 'provisional'];
 
@@ -81,7 +77,7 @@ export function buildWindows(today: string): SupplyWindow[] {
   for (const l of LISTINGS) {
     const p = byProduct.get(l.productId)!;
     WEEK_CONFIDENCE.forEach((confidence, week) => {
-      const start = addDays(today, week * 7);
+      const start = addDays(mondayOf(today), week * 7); // Monday-to-Sunday weeks
       const month = Number(start.slice(5, 7));
       if (p.season.length && !p.season.includes(month)) return;
       const jitter = 0.6 + (hash(l.id + week) % 80) / 100; // 0.6 – 1.39

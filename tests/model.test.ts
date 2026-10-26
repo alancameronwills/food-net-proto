@@ -67,7 +67,7 @@ describe('seed data', () => {
     for (const w of seed.windows) { expect(listings.has(w.listingId)).toBe(true); expect(w.qtyTotal).toBeGreaterThan(0); }
   });
   it('has windows starting today, with in-stock first and later forecast', () => {
-    const first = seed.windows.filter((w) => w.start === '2026-10-26');
+    const first = seed.windows.filter((w) => w.start === '2026-10-26'); // 26 Oct 2026 is a Monday
     expect(first.length).toBeGreaterThan(0);
     expect(first.every((w) => w.confidence === 'in_stock')).toBe(true);
     expect(seed.windows.some((w) => w.confidence === 'provisional')).toBe(true);

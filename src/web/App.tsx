@@ -68,7 +68,7 @@ export function App() {
               !me ? <Navigate to="/" /> :
               !boot.data ? <p>{t('loading')}</p> :
               me.role === 'buyer' ? <BuyerHome me={me} boot={boot.data} /> :
-              me.role === 'producer' ? <ProducerHome me={me} boot={boot.data} /> :
+              me.role === 'producer' ? <ProducerHome me={me} boot={boot.data} reloadBoot={boot.reload} /> :
               <Navigate to="/lab" />
             } />
             <Route path="/lab" element={

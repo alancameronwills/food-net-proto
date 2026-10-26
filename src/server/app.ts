@@ -5,6 +5,7 @@ import {
   listWindows, resetSession, updateConfig,
 } from './store';
 import type { Organisation, Persona } from '../shared/types';
+import { addListing, addWeeks, removeListing, removeWindow, updateListing, upsertWindow, type Result } from './producer';
 
 type Env = { Variables: { s: Session; persona?: Organisation } };
 
@@ -53,6 +54,24 @@ app.get('/bootstrap', async (c) => {
 });
 
 app.get('/windows', async (c) => c.json(await listWindows(c.get('s'))));
+
+// Producer stock management. Producers edit their own listings; the operator may edit any.
+const reply = (c: Context<Env>, r: Result<Record<string, unknown>>) => {
+  if (r.ok) { const { ok: _ok, ...rest } = r; return c.json(rest); }
+  return c.json({ error: r.error }, r.status);
+};
+const jsonBody = async (c: Context<Env>): Promise<Record<string, any>> => {
+  const b = await c.req.json().catch(() => null);
+  return b && typeof b === 'object' ? b : {};
+};
+
+app.post('/listings', async (c) => reply(c, await addListing(c.get('s'), c.get('persona'), await jsonBody(c))));
+app.put('/listings/:id', async (c) => reply(c, await updateListing(c.get('s'), c.get('persona'), c.req.param('id'), await jsonBody(c))));
+app.delete('/listings/:id', async (c) => reply(c, await removeListing(c.get('s'), c.get('persona'), c.req.param('id'))));
+app.put('/windows', async (c) => reply(c, await upsertWindow(c.get('s'), c.get('persona'), await jsonBody(c))));
+app.post('/windows/bulk', async (c) => reply(c, await addWeeks(c.get('s'), c.get('persona'), await jsonBody(c))));
+app.delete('/windows', async (c) =>
+  reply(c, await removeWindow(c.get('s'), c.get('persona'), c.req.query('listingId') ?? '', c.req.query('start') ?? '')));
 
 app.get('/config', async (c) => c.json(await getConfig(c.get('s'))));
 
