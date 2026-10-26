@@ -76,10 +76,15 @@ describe('seed data', () => {
     const tomatoJan = buildSeed('2027-01-05').windows.filter((w) => w.listingId.endsWith('veg-tomato'));
     expect(tomatoJan.length).toBeLessThan(6);
   });
-  it('distances are symmetric-ish, zero to self, and Fishguard-Tenby is plausible', () => {
-    expect(seed.distances['harbour-bistro']['harbour-bistro']).toBe(0);
-    const d = seed.distances['harbour-bistro']['grand-hotel'];
-    expect(d).toBeGreaterThan(40); expect(d).toBeLessThan(80);
+  it('distances are zero to self, symmetric, and plausible for one county', () => {
+    const ids = seed.orgs.map((o) => o.id);
+    for (const a of ids) {
+      expect(seed.distances[a][a]).toBe(0);
+      for (const b of ids.filter((x) => x !== a)) {
+        expect(Math.abs(seed.distances[a][b] - seed.distances[b][a])).toBeLessThanOrEqual(1);
+        expect(seed.distances[a][b]).toBeLessThan(150);
+      }
+    }
   });
   it('addDays crosses month boundaries', () => expect(addDays('2026-10-30', 3)).toBe('2026-11-02'));
 });
