@@ -8,6 +8,7 @@ import type { SupplyWindow } from '../../shared/types';
 import type { Bootstrap } from '../api';
 import { loc } from '../i18n';
 import { CONF_STYLE } from './StockEditor';
+import { TrustChip } from './TrustChip';
 
 export const longDate = (iso: string, lang: string) =>
   new Date(iso + 'T00:00:00Z').toLocaleDateString(lang === 'cy' ? 'cy-GB' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
@@ -77,6 +78,7 @@ export function Browse({ buyerId, boot, windows, date, onDate, qtyInCart, onAdd,
               </div>
               <div className="text-sm">{o.producer.name} · {o.producer.town} · {t('km', { n: o.driveKm })}
                 {av.farWarning && <span className="ml-2 rounded bg-gold-light px-1.5 text-xs font-semibold text-amber-900">{t('farWarning')}</span>}
+                <span className="ml-2"><TrustChip producerId={o.producer.id} boot={boot} /></span>
               </div>
               <div className="mt-1 text-sm">£{o.listing.pricePerUnit.toFixed(2)} {t('perUnit', { unit: t(`units.${o.product.unit}`) })} · {t('minShort', { n: o.listing.minOrder })}
                 {tiers?.map((x) => <span key={x.minQty} className="ml-2 text-brand">{t('tierBreak', { qty: x.minQty, price: x.price.toFixed(2) })}</span>)}

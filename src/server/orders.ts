@@ -3,6 +3,7 @@ import { capabilities } from '../shared/models';
 import { availabilityFor, lineTotal, reservableLimit, unitPriceFor, windowKey, type Unavailable } from '../shared/orders';
 import type { Order, OrderLine, OrderStatus, Organisation, StockState, SupplyWindow } from '../shared/types';
 import type { Session, TxItem } from './db';
+import { emit, type EventParams, type EventType } from './events';
 import type { Result } from './producer';
 import { getConfig, getDistances, listCategories, listListings, listProducts } from './store';
 
@@ -39,6 +40,20 @@ async function load(s: Session) {
 type Ctx = Awaited<ReturnType<typeof load>>;
 
 const nowIso = () => new Date().toISOString();
+
+/** Tell people about something that happened to an order. Never lets a notification problem undo the order itself. */
+async function announce(s: Session, type: EventType, o: Order, extra: EventParams = {}, to: ('buyer' | 'producer')[] = []) {
+  try {
+    const [buyer, producer] = await Promise.all([s.get<Organisation>('ORG', o.buyerId), s.get<Organisation>('ORG', o.producerId)]);
+    const first = o.lines[0];
+    await emit(s, type, {
+      orderId: o.id, buyer: buyer?.name, producer: producer?.name, date: o.deliveryDate,
+      ...(o.lines.length === 1 ? { productId: first.productId, qty: first.qty } : {}), ...extra,
+    }, to.map((who) => (who === 'buyer' ? o.buyerId : o.producerId)));
+  } catch (e) {
+    console.error('announce failed', e);
+  }
+}
 
 // ---- reading -------------------------------------------------------------------------------
 
@@ -150,7 +165,10 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
       note, createdAt: at, history: [{ at, status, by: actor.id }],
     };
     const err = await writeNewOrder(s, ctx, order, windows);
-    if (err) result.failed.push({ producerId, error: err }); else result.orders.push(order);
+    if (err) { result.failed.push({ producerId, error: err }); continue; }
+    result.orders.push(order);
+    await announce(s, 'order_placed', order, {}, ['producer']);
+    if (order.status === 'confirmed') await announce(s, 'order_confirmed', order, {}, ['buyer']);
   }
   if (result.orders.length === 0) return fail(409, result.failed[0]?.error ?? 'Could not place the order');
   return { ok: true, ...result };
@@ -177,10 +195,15 @@ async function writeNewOrder(s: Session, ctx: Ctx, order: Order, known: Map<stri
 // ---- status changes ------------------------------------------------------------------------------
 
 const names = { '#st': 'status', '#sk': 'stock', '#h': 'history', '#ua': 'updatedAt' };
-function orderUpdate(s: Session, order: Order, to: OrderStatus, stock: StockState, by: string, note?: string): TxItem {
+/** Move an order to a new status (only if it is still in the state we read), recording who did it. */
+function orderUpdate(s: Session, order: Order, to: OrderStatus, stock: StockState, by: string, note?: string, extra: Record<string, unknown> = {}): TxItem {
   const entry = { at: nowIso(), status: to, by, ...(note ? { note } : {}) };
-  return s.tUpdate('ORDER', order.id, 'SET #st = :to, #sk = :stock, #ua = :at, #h = list_append(#h, :entry)', names,
-    { ':to': to, ':stock': stock, ':at': entry.at, ':entry': [entry], ':from': order.status, ':oldstock': order.stock },
+  const extraKeys = Object.keys(extra);
+  return s.tUpdate('ORDER', order.id,
+    'SET #st = :to, #sk = :stock, #ua = :at, #h = list_append(#h, :entry)' + extraKeys.map((k) => `, #x_${k} = :x_${k}`).join(''),
+    { ...names, ...Object.fromEntries(extraKeys.map((k) => [`#x_${k}`, k])) },
+    { ':to': to, ':stock': stock, ':at': entry.at, ':entry': [entry], ':from': order.status, ':oldstock': order.stock,
+      ...Object.fromEntries(extraKeys.map((k) => [`:x_${k}`, extra[k]])) },
     '#st = :from AND #sk = :oldstock');
 }
 
@@ -207,7 +230,11 @@ export async function confirmOrder(s: Session, actor: Organisation | undefined, 
       ops.push(...stockOps(s, ctx, order, windows, 'reserve'));
     }
     const tx = await s.transact(ops);
-    if (tx.ok) return { ok: true, order: (await loadOrder(s, id))! };
+    if (tx.ok) {
+      const done = (await loadOrder(s, id))!;
+      await announce(s, 'order_confirmed', done, {}, ['buyer']);
+      return { ok: true, order: done };
+    }
   }
   return fail(409, 'The order changed at the same time; please look again');
 }
@@ -222,7 +249,12 @@ async function release(s: Session, actor: Organisation, id: string, to: 'decline
     const ops: TxItem[] = [orderUpdate(s, order, to, 'none', actor.id, note)];
     if (order.stock !== 'none') ops.push(...stockOps(s, ctx, order, await readWindows(s, order), 'release'));
     const tx = await s.transact(ops);
-    if (tx.ok) return { ok: true, order: (await loadOrder(s, id))! };
+    if (tx.ok) {
+      const done = (await loadOrder(s, id))!;
+      if (to === 'declined') await announce(s, 'order_declined', done, note ? { reason: note } : {}, ['buyer']);
+      else await announce(s, 'order_cancelled', done, {}, ['producer']);
+      return { ok: true, order: done };
+    }
   }
   return fail(409, 'The order changed at the same time; please look again');
 }
@@ -243,3 +275,60 @@ export const cancelOrder = (s: Session, actor: Organisation | undefined, id: str
           : actor.role === 'buyer' && o.deliveryDate <= todayIso() ? fail(409, 'Too late to cancel: delivery is today or has passed')
             : null)
     : Promise.resolve(fail(403, 'Not signed in'));
+
+// ---- fulfilment ----------------------------------------------------------------------------------
+
+/** Producer has the order ready. */
+export async function pickOrder(s: Session, actor: Organisation | undefined, id: string): Promise<Result<{ order: Order }>> {
+  const order = await loadOrder(s, id);
+  if (!order) return fail(404, 'No such order');
+  if (!isProducerOf(actor, order)) return fail(403, 'Only the producer can do this');
+  if (order.status !== 'confirmed') return fail(409, `Only a confirmed order can be marked as picked (this one is ${order.status})`);
+  const tx = await s.transact([orderUpdate(s, order, 'picked', order.stock, actor!.id)]);
+  if (!tx.ok) return fail(409, 'The order changed at the same time; please look again');
+  const done = (await loadOrder(s, id))!;
+  await announce(s, 'order_picked', done, {}, ['buyer']);
+  return { ok: true, order: done };
+}
+
+/**
+ * Record what was actually delivered. Delivering everything makes the order `delivered`; any shortfall makes it `short`.
+ * Reserved stock stays reserved (it has been used), so a short delivery does not put the shortfall back on sale.
+ */
+export async function deliverOrder(s: Session, actor: Organisation | undefined, id: string, lines?: unknown): Promise<Result<{ order: Order }>> {
+  const order = await loadOrder(s, id);
+  if (!order) return fail(404, 'No such order');
+  if (!isProducerOf(actor, order)) return fail(403, 'Only the producer can do this');
+  if (order.status !== 'confirmed' && order.status !== 'picked') return fail(409, `Only a confirmed or picked order can be delivered (this one is ${order.status})`);
+
+  const given = new Map<string, number>();
+  if (lines !== undefined) {
+    if (!Array.isArray(lines)) return fail(400, 'lines must be a list');
+    for (const l of lines as { listingId?: unknown; qty?: unknown }[]) {
+      if (typeof l?.listingId !== 'string' || !Number.isInteger(l.qty) || (l.qty as number) < 0) return fail(400, 'Each delivered line needs a listingId and a whole quantity');
+      given.set(l.listingId, l.qty as number);
+    }
+  }
+  const delivered = order.lines.map((l) => ({ listingId: l.listingId, qty: given.get(l.listingId) ?? l.qty }));
+  for (const d of delivered) {
+    const ordered = order.lines.find((l) => l.listingId === d.listingId)!.qty;
+    if (d.qty > ordered) return fail(400, 'You cannot deliver more than was ordered');
+  }
+  const short = delivered.some((d, i) => d.qty < order.lines[i].qty);
+  const deliveredTotal = Math.round(delivered.reduce((n, d, i) => n + lineTotal(order.lines[i].unitPrice, d.qty), 0) * 100) / 100;
+  const status: OrderStatus = short ? 'short' : 'delivered';
+  const tx = await s.transact([orderUpdate(s, order, status, order.stock, actor!.id, undefined, { delivered, deliveredTotal })]);
+  if (!tx.ok) return fail(409, 'The order changed at the same time; please look again');
+  const done = (await loadOrder(s, id))!;
+  await announce(s, short ? 'order_short' : 'order_delivered', done, short ? { price: deliveredTotal } : {}, ['buyer']);
+  return { ok: true, order: done };
+}
+
+/** The buyer has seen the "supply was reduced" warning and keeps the order anyway. */
+export async function dismissFlags(s: Session, actor: Organisation | undefined, id: string): Promise<Result<{ order: Order }>> {
+  const order = await loadOrder(s, id);
+  if (!order) return fail(404, 'No such order');
+  if (!(actor?.role === 'operator' || (actor?.role === 'buyer' && actor.id === order.buyerId))) return fail(403, 'Only the buyer can do this');
+  await s.updateIf('ORDER', id, { flags: [] });
+  return { ok: true, order: (await loadOrder(s, id))! };
+}

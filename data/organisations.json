@@ -63,6 +63,11 @@
       "en": "Upland lamb, beef and root vegetables.",
       "cy": "Oen, cig eidion a llysiau gwraidd o’r ucheldir."
     },
+    "verified": true,
+    "baseline": {
+      "orders": 31,
+      "fillRate": 0.96
+    },
     "offers": [
       {
         "product": "meat-lamb",
@@ -102,6 +107,11 @@
     "blurb": {
       "en": "Family dairy: milk, cream, eggs and cheddar.",
       "cy": "Llaethdy teuluol: llaeth, hufen, wyau a cheddar."
+    },
+    "verified": true,
+    "baseline": {
+      "orders": 52,
+      "fillRate": 0.985
     },
     "offers": [
       {
@@ -143,6 +153,11 @@
       "en": "Small creamery making milk, cream and blue cheese.",
       "cy": "Hufenfa fach yn gwneud llaeth, hufen a chaws glas."
     },
+    "verified": true,
+    "baseline": {
+      "orders": 27,
+      "fillRate": 0.94
+    },
     "offers": [
       {
         "product": "milk-whole",
@@ -176,6 +191,11 @@
     "certifications": [
       "msc-line-caught"
     ],
+    "verified": true,
+    "baseline": {
+      "orders": 19,
+      "fillRate": 0.88
+    },
     "offers": [
       {
         "product": "fish-crab",
@@ -211,6 +231,11 @@
       "en": "Sourdough and traditional Welsh bakes.",
       "cy": "Surdoes a nwyddau pobi Cymreig traddodiadol."
     },
+    "verified": true,
+    "baseline": {
+      "orders": 64,
+      "fillRate": 0.99
+    },
     "offers": [
       {
         "product": "bread-sour",
@@ -239,6 +264,10 @@
     "certifications": [
       "organic"
     ],
+    "baseline": {
+      "orders": 22,
+      "fillRate": 0.91
+    },
     "offers": [
       {
         "product": "veg-leek",
@@ -279,6 +308,11 @@
       "en": "Local lamb, beef and sausages.",
       "cy": "Oen, cig eidion a selsig lleol."
     },
+    "verified": true,
+    "baseline": {
+      "orders": 38,
+      "fillRate": 0.97
+    },
     "offers": [
       {
         "product": "meat-lamb",
@@ -309,6 +343,10 @@
       "en": "Packing and processing local shellfish and fish.",
       "cy": "Pacio a phrosesu pysgod cregyn a physgod lleol."
     },
+    "baseline": {
+      "orders": 15,
+      "fillRate": 0.93
+    },
     "offers": [
       {
         "product": "fish-crab",
@@ -338,6 +376,11 @@
     "blurb": {
       "en": "Farmhouse cheeses and a little milk.",
       "cy": "Cawsiau fferm ac ychydig o laeth."
+    },
+    "verified": true,
+    "baseline": {
+      "orders": 44,
+      "fillRate": 0.95
     },
     "offers": [
       {

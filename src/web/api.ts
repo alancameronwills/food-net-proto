@@ -2,9 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Category, DriveDistances, Listing, Order, Organisation, Persona, Product, SupplyWindow } from '../shared/types';
 import type { ModelConfig } from '../shared/models';
 
+export type AppEvent = {
+  id?: string; at: string; type: string; read?: boolean;
+  params: { orderId?: string; requestId?: string; buyer?: string; producer?: string; productId?: string; qty?: number; price?: number; reason?: string; date?: string };
+};
+
 export type Bootstrap = {
   config: ModelConfig; orgs: Organisation[]; categories: Category[]; products: Product[];
   listings: Listing[]; distances: DriveDistances;
+  reliability: Record<string, { score: number | null; orders: number }>;
 };
 
 const params = new URLSearchParams(location.search);
@@ -53,5 +59,7 @@ export function usePolled<T>(path: string, ms = 3000) {
 
 export const useBootstrap = () => usePolled<Bootstrap>('/bootstrap');
 export const useWindows = () => usePolled<SupplyWindow[]>('/windows', 5000);
+export const useNotifications = () => usePolled<AppEvent[]>('/notifications', 3000);
+export const useActivity = (ms = 3000) => usePolled<AppEvent[]>('/activity', ms);
 export const useOrders = () => usePolled<Order[]>('/orders', 3000);
 export const fetchPersonas = () => api<Persona[]>('/personas');

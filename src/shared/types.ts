@@ -12,6 +12,10 @@ export type Organisation = {
   lat: number;
   lon: number;
   blurb: Bilingual;
+  /** Producers only: shown as a "verified member" badge under the badges trust model. */
+  verified?: boolean;
+  /** Producers only: past delivery record before this session, so reliability scores are meaningful from the start. */
+  baseline?: { orders: number; fillRate: number };
 };
 
 export type CategoryId = 'milk' | 'eggs' | 'bread' | 'veg' | 'meat' | 'fish' | 'cheese';
@@ -67,8 +71,8 @@ export type DriveDistances = Record<string, Record<string, number>>; // km, orgI
 
 export type Persona = Pick<Organisation, 'id' | 'role' | 'name' | 'kind' | 'town' | 'blurb'>;
 
-/** declined = producer said no; cancelled = buyer (or operator) withdrew. */
-export type OrderStatus = 'placed' | 'confirmed' | 'declined' | 'cancelled';
+/** declined = producer said no; cancelled = buyer (or operator) withdrew; short = delivered, but less than ordered. */
+export type OrderStatus = 'placed' | 'confirmed' | 'picked' | 'delivered' | 'short' | 'declined' | 'cancelled';
 /** Whether the order currently holds stock: none, a soft hold awaiting confirmation, or firmly reserved. */
 export type StockState = 'none' | 'held' | 'reserved';
 
@@ -86,6 +90,13 @@ export type Order = {
   lines: OrderLine[];
   total: number;
   note?: string;
+  /** Set when the order arises from accepting a bid on a demand request. */
+  source?: { requestId: string; bidId: string };
+  /** Quantities actually delivered, once delivery is recorded. */
+  delivered?: { listingId: string; qty: number }[];
+  deliveredTotal?: number;
+  /** Supply behind this order was reduced after it was placed; the buyer decides what to do. */
+  flags?: { listingId: string; shortBy: number; at: string }[];
   createdAt: string; // ISO timestamp
   history: { at: string; status: OrderStatus; by: string; note?: string }[];
 };

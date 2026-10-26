@@ -8,7 +8,8 @@ import { loc, setLang } from './i18n';
 import { Picker } from './pages/Picker';
 import { BuyerHome } from './pages/BuyerHome';
 import { ProducerHome } from './pages/ProducerHome';
-import { ModelLab } from './pages/ModelLab';
+import { OperatorHome } from './pages/OperatorHome';
+import { EventsPanel } from './pages/EventsPanel';
 
 const ROLE_COLOUR = { buyer: 'bg-brand', producer: 'bg-emerald-700', operator: 'bg-slate-800' } as const;
 
@@ -36,6 +37,7 @@ export function App() {
           </Link>
           <span className="hidden text-sm text-blue-100 sm:inline">{t('tagline')}</span>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <EventsPanel boot={boot.data} signedIn={!!me} />
             <span className="rounded bg-brand-dark px-2 py-1">{t('session')}: <b>{ctx.session}</b></span>
             <button className="rounded bg-gold px-3 py-1 font-semibold text-brand-dark" onClick={() => setLang(i18n.language === 'cy' ? 'en' : 'cy')}>
               {t('language')}
@@ -74,7 +76,7 @@ export function App() {
             <Route path="/lab" element={
               me?.role !== 'operator' ? <Navigate to="/" /> :
               !boot.data ? <p>{t('loading')}</p> :
-              <ModelLab boot={boot.data} personas={personas} reload={boot.reload} />
+              <OperatorHome boot={boot.data} personas={personas} reload={boot.reload} />
             } />
           </Routes>
         )}

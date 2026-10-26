@@ -1,7 +1,8 @@
 import { addDays, isIsoDate, isMonday, mondayOf, todayIso } from '../shared/dates';
 import type { Confidence, Listing, Organisation, SupplyWindow } from '../shared/types';
 import type { Session } from './db';
-import { listProducts } from './store';
+import { getConfig, listProducts } from './store';
+import { reviewSupplyCut } from './supply';
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; status: 400 | 403 | 404 | 409; error: string };
 const fail = (status: 400 | 403 | 404 | 409, error: string): Result<never> => ({ ok: false, status, error });
@@ -98,7 +99,7 @@ function checkWeek(start: unknown): Result<{ start: string }> {
 }
 
 /** Set (or create) one week's supply. Quantity can never drop below what buyers have already reserved. */
-export async function upsertWindow(s: Session, actor: Organisation | undefined, body: Record<string, any>): Promise<Result<{ window: SupplyWindow }>> {
+export async function upsertWindow(s: Session, actor: Organisation | undefined, body: Record<string, any>): Promise<Result<{ window: SupplyWindow; flagged: number }>> {
   const got = await ownedListing(s, actor, body.listingId);
   if (!got.ok) return got;
   const week = checkWeek(body.start);
@@ -107,6 +108,7 @@ export async function upsertWindow(s: Session, actor: Organisation | undefined, 
   if (!CONFIDENCES.includes(body.confidence)) return fail(400, 'confidence must be in_stock, forecast or provisional');
 
   const sk = winSk(got.listing.id, week.start);
+  const before = await s.get<SupplyWindow>('WINDOW', sk);
   const updated = await s.updateIf('WINDOW', sk, { qtyTotal: body.qtyTotal, confidence: body.confidence },
     'attribute_exists(pk) AND #qtyReserved <= :q', { ':q': body.qtyTotal });
   if (!updated) {
@@ -118,7 +120,10 @@ export async function upsertWindow(s: Session, actor: Organisation | undefined, 
     };
     if (!(await s.create('WINDOW', sk, fresh))) return fail(409, 'Someone changed this week at the same time; please retry');
   }
-  return { ok: true, window: (await s.get<SupplyWindow>('WINDOW', sk))! };
+  const window = (await s.get<SupplyWindow>('WINDOW', sk))!;
+  // If this cut leaves orders without stock, flag them for the buyers to decide
+  const flagged = await reviewSupplyCut(s, await getConfig(s), before, window);
+  return { ok: true, window, flagged };
 }
 
 /** Add `weeks` weeks of supply starting at `from`, skipping weeks that already exist. */

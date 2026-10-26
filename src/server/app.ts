@@ -5,7 +5,9 @@ import {
   listWindows, resetSession, updateConfig,
 } from './store';
 import type { Organisation, Persona } from '../shared/types';
-import { cancelOrder, confirmOrder, declineOrder, listOrders, placeOrders } from './orders';
+import { cancelOrder, confirmOrder, declineOrder, deliverOrder, dismissFlags, listOrders, pickOrder, placeOrders } from './orders';
+import { markAllRead, notificationsFor, recentActivity } from './events';
+import { reliabilityFor } from '../shared/reliability';
 import { addListing, addWeeks, removeListing, removeWindow, updateListing, upsertWindow, type Result } from './producer';
 
 type Env = { Variables: { s: Session; persona?: Organisation } };
@@ -51,7 +53,8 @@ app.get('/bootstrap', async (c) => {
   const [config, orgs, categories, products, listings, distances] = await Promise.all([
     getConfig(s), listOrgs(s), listCategories(s), listProducts(s), listListings(s), getDistances(s),
   ]);
-  return c.json({ config, orgs, categories, products, listings, distances });
+  const reliability = reliabilityFor(orgs, await s.list('ORDER'));
+  return c.json({ config, orgs, categories, products, listings, distances, reliability });
 });
 
 app.get('/windows', async (c) => c.json(await listWindows(c.get('s'))));
@@ -80,7 +83,23 @@ app.post('/orders', async (c) => reply(c, await placeOrders(c.get('s'), c.get('p
 app.post('/orders/:id/confirm', async (c) => reply(c, await confirmOrder(c.get('s'), c.get('persona'), c.req.param('id'))));
 app.post('/orders/:id/decline', async (c) =>
   reply(c, await declineOrder(c.get('s'), c.get('persona'), c.req.param('id'), (await jsonBody(c)).reason)));
+app.post('/orders/:id/pick', async (c) => reply(c, await pickOrder(c.get('s'), c.get('persona'), c.req.param('id'))));
+app.post('/orders/:id/deliver', async (c) =>
+  reply(c, await deliverOrder(c.get('s'), c.get('persona'), c.req.param('id'), (await jsonBody(c)).lines)));
+app.post('/orders/:id/dismiss-flags', async (c) => reply(c, await dismissFlags(c.get('s'), c.get('persona'), c.req.param('id'))));
 app.post('/orders/:id/cancel', async (c) => reply(c, await cancelOrder(c.get('s'), c.get('persona'), c.req.param('id'))));
+
+// Notifications for the acting organisation, and the network-wide activity feed.
+app.get('/notifications', async (c) => {
+  const p = c.get('persona');
+  return c.json(p ? await notificationsFor(c.get('s'), p.id) : []);
+});
+app.post('/notifications/read', async (c) => {
+  const p = c.get('persona');
+  if (p) await markAllRead(c.get('s'), p.id);
+  return c.json({ ok: true });
+});
+app.get('/activity', async (c) => c.json(await recentActivity(c.get('s'))));
 
 app.get('/config', async (c) => c.json(await getConfig(c.get('s'))));
 

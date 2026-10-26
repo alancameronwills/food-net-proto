@@ -30,8 +30,14 @@ export function StockCard({ listing, product, windows, config, reload }: {
   const byStart = new Map(windows.map((w) => [w.start, w]));
   const lastQty = [...windows].sort((a, b) => b.start.localeCompare(a.start))[0]?.qtyTotal ?? listing.minOrder * 10;
 
+  const [notice, setNotice] = useState('');
   const run = async (f: () => Promise<unknown>) => {
-    try { setError(''); await f(); reload(); } catch (e) { setError((e as Error).message); }
+    try {
+      setError(''); setNotice('');
+      const r = (await f()) as { flagged?: number } | undefined;
+      if (r?.flagged) setNotice(t('cutWarning', { n: r.flagged }));
+      reload();
+    } catch (e) { setError((e as Error).message); }
   };
 
   return (
@@ -51,6 +57,7 @@ export function StockCard({ listing, product, windows, config, reload }: {
           })} />
       )}
       {error && <p role="alert" className="mt-2 rounded bg-red-100 p-2 text-sm text-red-800">{error}</p>}
+      {notice && <p role="status" data-testid="cut-warning" className="mt-2 rounded bg-orange-100 p-2 text-sm font-semibold text-orange-900">{notice}</p>}
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         {weeks.map((monday) => (

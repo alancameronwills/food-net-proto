@@ -41,11 +41,17 @@ export function parseOrganisations(raw: unknown, productIds: Set<string>): { org
           pricePerUnit: o.price, minOrder: o.minOrder, certifications: Array.isArray(r.certifications) ? r.certifications : [],
         });
       });
-    } else if (r.offers) bad('only producers can have "offers"');
+      if (r.baseline !== undefined && !(Number.isInteger(r.baseline?.orders) && r.baseline.orders >= 0 && isNum(r.baseline?.fillRate) && r.baseline.fillRate >= 0 && r.baseline.fillRate <= 1)) {
+        bad('"baseline" must look like { "orders": 40, "fillRate": 0.95 } (fillRate between 0 and 1)');
+      }
+    } else if (r.offers || r.baseline || r.verified) bad('only producers can have "offers", "baseline" or "verified"');
+    if (r.verified !== undefined && typeof r.verified !== 'boolean') bad('"verified" must be true or false');
 
     orgs.push({
       id: r.id, role: r.role, name: r.name, kind: r.kind, town: r.town, lat: r.lat, lon: r.lon,
       blurb: { en: r.blurb?.en, cy: isStr(r.blurb?.cy) ? r.blurb.cy : r.blurb?.en },
+      ...(r.verified ? { verified: true } : {}),
+      ...(r.baseline ? { baseline: { orders: r.baseline.orders, fillRate: r.baseline.fillRate } } : {}),
     });
   });
 
