@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Pembrokeshire flag: blue and gold */
+@theme {
+  --color-brand: #17357f;
+  --color-brand-dark: #0f2559;
+  --color-brand-light: #e8edf9;
+  --color-gold: #f5b700;
+  --color-gold-light: #fff4cc;
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+}
+
+html { font-size: 17px; } /* a touch larger for Zoom screen-share */
+body { @apply bg-slate-50 text-slate-900; }

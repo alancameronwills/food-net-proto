@@ -1,0 +1,83 @@
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { DIMENSIONS, type ModelConfig } from '../../shared/models';
+import type { Persona } from '../../shared/types';
+import { api, ctx, type Bootstrap } from '../api';
+import { loc } from '../i18n';
+
+export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas: Persona[]; reload: () => void }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState('');
+  const c = boot.config;
+
+  const change = async (patch: Partial<ModelConfig>) => {
+    await api('/config', { method: 'PUT', body: JSON.stringify(patch) });
+    reload();
+  };
+  const link = (id: string) => `${location.origin}/home?s=${ctx.session}&as=${id}`;
+  const copy = async (id: string) => {
+    await navigator.clipboard.writeText(link(id));
+    setCopied(id);
+    setTimeout(() => setCopied(''), 1500);
+  };
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-brand">{t('modelLab')}</h1>
+        <p className="text-slate-600">{t('modelLabIntro')}</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {DIMENSIONS.map((d) => {
+          const active = d.options.find((o) => o.id === c[d.id]);
+          return (
+            <fieldset key={d.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <legend className="px-1 text-lg font-semibold text-brand-dark">{loc(d.label)}</legend>
+              <div className="flex flex-wrap gap-2">
+                {d.options.map((o) => (
+                  <button key={o.id} onClick={() => change({ [d.id]: o.id })} aria-pressed={o.id === c[d.id]}
+                    className={`rounded-full border px-3 py-1 text-sm font-medium ${o.id === c[d.id] ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white hover:border-brand'}`}>
+                    {loc(o.label)}
+                  </button>
+                ))}
+              </div>
+              {active && <p className="mt-2 text-sm text-slate-600">{loc(active.explain)}</p>}
+              {d.id === 'forecastOrdering' && c.forecastOrdering === 'pct_limit' && (
+                <label className="mt-2 block text-sm">{t('forecastPct')}: <b>{Math.round(c.forecastPct * 100)}%</b>
+                  <input type="range" min={0} max={100} step={5} value={Math.round(c.forecastPct * 100)}
+                    onChange={(e) => change({ forecastPct: Number(e.target.value) / 100 })} className="block w-full accent-[#17357f]" />
+                </label>
+              )}
+              {d.id === 'localRange' && c.localRange === 'flat' && (
+                <label className="mt-2 block text-sm">{t('flatRadius')}: <b>{c.flatRadiusKm}</b>
+                  <input type="range" min={10} max={150} step={5} value={c.flatRadiusKm}
+                    onChange={(e) => change({ flatRadiusKm: Number(e.target.value) })} className="block w-full accent-[#17357f]" />
+                </label>
+              )}
+            </fieldset>
+          );
+        })}
+      </div>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-lg font-semibold text-brand-dark">{t('shareLinks')}</h2>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {personas.filter((p) => p.role !== 'operator').map((p) => (
+            <li key={p.id} className="flex items-center justify-between gap-2 rounded border border-slate-100 p-2 text-sm">
+              <span>{p.name} <span className="text-slate-500">({p.kind})</span></span>
+              <button className="rounded bg-gold px-2 py-1 font-semibold text-brand-dark" onClick={() => copy(p.id)}>
+                {copied === p.id ? t('copied') : t('copyLink')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <button className="rounded border border-red-300 px-4 py-2 text-red-700 hover:bg-red-50"
+        onClick={async () => { if (confirm(t('resetConfirm'))) { await api('/admin/reset', { method: 'POST' }); reload(); alert(t('resetDone')); } }}>
+        {t('resetSession')}
+      </button>
+    </div>
+  );
+}
