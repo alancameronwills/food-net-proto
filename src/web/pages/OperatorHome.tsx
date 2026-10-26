@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Persona } from '../../shared/types';
-import { useActivity, useOrders, type Bootstrap } from '../api';
+import { useActivity, useOrders, useRequests, type Bootstrap } from '../api';
 import { EventList } from './EventsPanel';
 import { ModelLab } from './ModelLab';
 import { Overview } from './Overview';
@@ -13,6 +13,7 @@ export function OperatorHome({ boot, personas, reload }: { boot: Bootstrap; pers
   const [tab, setTab] = useState<Tab>('lab');
   const { data: orders = [] } = useOrders();
   const { data: activity = [] } = useActivity();
+  const { data: requests = [] } = useRequests();
   const tabs: [Tab, string][] = [['lab', t('labTab')], ['overview', t('overviewTab')], ['activity', t('activityTab')]];
   return (
     <div>
@@ -23,7 +24,7 @@ export function OperatorHome({ boot, personas, reload }: { boot: Bootstrap; pers
         ))}
       </div>
       {tab === 'lab' && <ModelLab boot={boot} personas={personas} reload={reload} />}
-      {tab === 'overview' && <Overview orders={orders} boot={boot} />}
+      {tab === 'overview' && <Overview orders={orders} requests={requests} boot={boot} />}
       {tab === 'activity' && (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <p className="px-3 pt-2 text-sm text-slate-600">{t('activityHint')}</p>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Category, DriveDistances, Listing, Order, Organisation, Persona, Product, SupplyWindow } from '../shared/types';
+import type { Category, DriveDistances, Listing, Order, Organisation, Persona, Product, RequestView, SupplyWindow } from '../shared/types';
 import type { ModelConfig } from '../shared/models';
 
 export type AppEvent = {
@@ -61,5 +61,6 @@ export const useBootstrap = () => usePolled<Bootstrap>('/bootstrap');
 export const useWindows = () => usePolled<SupplyWindow[]>('/windows', 5000);
 export const useNotifications = () => usePolled<AppEvent[]>('/notifications', 3000);
 export const useActivity = (ms = 3000) => usePolled<AppEvent[]>('/activity', ms);
+export const useRequests = () => usePolled<RequestView[]>('/requests', 3000);
 export const useOrders = () => usePolled<Order[]>('/orders', 3000);
 export const fetchPersonas = () => api<Persona[]>('/personas');

@@ -6,6 +6,7 @@ import {
 } from './store';
 import type { Organisation, Persona } from '../shared/types';
 import { cancelOrder, confirmOrder, declineOrder, deliverOrder, dismissFlags, listOrders, pickOrder, placeOrders } from './orders';
+import { acceptBid, closeRequest, createRequest, listRequests, placeBid, takeRequest, withdrawBid } from './requests';
 import { markAllRead, notificationsFor, recentActivity } from './events';
 import { reliabilityFor } from '../shared/reliability';
 import { addListing, addWeeks, removeListing, removeWindow, updateListing, upsertWindow, type Result } from './producer';
@@ -88,6 +89,15 @@ app.post('/orders/:id/deliver', async (c) =>
   reply(c, await deliverOrder(c.get('s'), c.get('persona'), c.req.param('id'), (await jsonBody(c)).lines)));
 app.post('/orders/:id/dismiss-flags', async (c) => reply(c, await dismissFlags(c.get('s'), c.get('persona'), c.req.param('id'))));
 app.post('/orders/:id/cancel', async (c) => reply(c, await cancelOrder(c.get('s'), c.get('persona'), c.req.param('id'))));
+
+// Speculative orders: buyers ask, producers bid (or accept the buyer's price), buyers choose.
+app.get('/requests', async (c) => c.json(await listRequests(c.get('s'), c.get('persona'))));
+app.post('/requests', async (c) => reply(c, await createRequest(c.get('s'), c.get('persona'), await jsonBody(c))));
+app.post('/requests/:id/bids', async (c) => reply(c, await placeBid(c.get('s'), c.get('persona'), c.req.param('id'), await jsonBody(c))));
+app.post('/requests/:id/bids/:bid/withdraw', async (c) => reply(c, await withdrawBid(c.get('s'), c.get('persona'), c.req.param('id'), c.req.param('bid'))));
+app.post('/requests/:id/accept', async (c) => reply(c, await acceptBid(c.get('s'), c.get('persona'), c.req.param('id'), (await jsonBody(c)).bidId)));
+app.post('/requests/:id/take', async (c) => reply(c, await takeRequest(c.get('s'), c.get('persona'), c.req.param('id'))));
+app.post('/requests/:id/close', async (c) => reply(c, await closeRequest(c.get('s'), c.get('persona'), c.req.param('id'))));
 
 // Notifications for the acting organisation, and the network-wide activity feed.
 app.get('/notifications', async (c) => {

@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import type { Order } from '../../shared/types';
+import { loc } from '../i18n';
+import type { Order, RequestView } from '../../shared/types';
 import type { Bootstrap } from '../api';
 import { fmtDate } from './StockEditor';
 import { STATUS_STYLE } from './OrderCard';
 
 /** Operator view: how the network is doing, and every order in it. */
-export function Overview({ orders, boot }: { orders: Order[]; boot: Bootstrap }) {
+export function Overview({ orders, requests, boot }: { orders: Order[]; requests: RequestView[]; boot: Bootstrap }) {
   const { t, i18n } = useTranslation();
   const live = orders.filter((o) => o.status !== 'declined' && o.status !== 'cancelled');
   const finished = orders.filter((o) => o.status === 'delivered' || o.status === 'short');
@@ -23,6 +24,7 @@ export function Overview({ orders, boot }: { orders: Order[]; boot: Bootstrap })
     [t('metricFill'), ordered ? `${Math.round((got / ordered) * 100)}%` : '–'],
     [t('metricProducers'), new Set(live.map((o) => o.producerId)).size],
     [t('metricListings'), boot.listings.length],
+    [t('metricRequests'), requests.filter((r) => r.status === 'open').length],
   ];
 
   return (
@@ -59,6 +61,31 @@ export function Overview({ orders, boot }: { orders: Order[]; boot: Bootstrap })
           </div>
         )}
       </section>
+      {requests.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-lg font-semibold text-brand-dark">{t('requestsHeading')}</h2>
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-brand-light text-brand-dark">
+                <tr><th className="p-2">{t('orderRef')}</th><th className="p-2">{t('buyerCol')}</th><th className="p-2">{t('product')}</th><th className="p-2">{t('reqQty')}</th><th className="p-2">{t('dateCol')}</th><th className="p-2">{t('statusCol')}</th><th className="p-2">{t('bidsHeading')}</th></tr>
+              </thead>
+              <tbody>
+                {requests.map((r) => (
+                  <tr key={r.id} className="border-t border-slate-100" data-testid={`overview-${r.id}`}>
+                    <td className="p-2 font-mono">{r.id}</td>
+                    <td className="p-2">{orgs.get(r.buyerId)?.name}</td>
+                    <td className="p-2">{loc(boot.products.find((p) => p.id === r.productId)!.name)}</td>
+                    <td className="p-2">{r.filledQty}/{r.qty}</td>
+                    <td className="p-2">{fmtDate(r.deliveryDate, i18n.language)}</td>
+                    <td className="p-2">{t(`reqStatus_${r.status}`)}</td>
+                    <td className="p-2">{r.bids.length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

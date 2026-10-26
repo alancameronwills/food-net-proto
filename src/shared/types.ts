@@ -100,3 +100,41 @@ export type Order = {
   createdAt: string; // ISO timestamp
   history: { at: string; status: OrderStatus; by: string; note?: string }[];
 };
+
+export type BidStatus = 'open' | 'accepted' | 'rejected' | 'withdrawn';
+export type Bid = {
+  id: string;
+  producerId: string;
+  price: number; // GBP per unit
+  qty: number;
+  note?: string;
+  createdAt: string;
+  status: BidStatus;
+  orderId?: string; // set once accepted
+};
+
+export type RequestStatus = 'open' | 'filled' | 'closed';
+
+/** A speculative order: a buyer asks for something for a future date, whether or not anyone lists it yet. */
+export type DemandRequest = {
+  id: string; // e.g. DR-101
+  buyerId: string;
+  productId: string;
+  qty: number;
+  deliveryDate: string;
+  /** Price per unit the buyer would pay; required under first-to-accept. */
+  targetPrice?: number;
+  note?: string;
+  status: RequestStatus;
+  filledQty: number;
+  bids: Bid[];
+  createdAt: string;
+  /** Bumped on every change, so simultaneous bids and acceptances cannot overwrite each other. */
+  version: number;
+};
+
+/** What a screen receives: bids are filtered by who is asking, and pooled demand is summarised. */
+export type RequestView = Omit<DemandRequest, 'version'> & {
+  bidCount: number;
+  pool?: { totalQty: number; requests: number; buyers: number };
+};

@@ -4,7 +4,7 @@ import { ensureTable, session, type Session } from './db';
 import { buildSeed, isoDate } from './seed';
 
 /** Item kinds that make up a demo session; `reset` wipes and reseeds all of them. */
-export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF'];
+export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF', 'REQUEST'];
 
 export async function resetSession(id: string, today = isoDate(new Date())): Promise<void> {
   await ensureTable();

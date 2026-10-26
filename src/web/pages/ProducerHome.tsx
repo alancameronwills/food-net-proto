@@ -3,18 +3,22 @@ import { useTranslation } from 'react-i18next';
 import { orderableQty } from '../../shared/browse';
 import { addDays, mondayOf, todayIso } from '../../shared/dates';
 import type { Persona } from '../../shared/types';
-import { useOrders, useWindows, type Bootstrap } from '../api';
+import { useOrders, useRequests, useWindows, type Bootstrap } from '../api';
+import { capabilities } from '../../shared/models';
 import { loc } from '../i18n';
 import { ListingsEditor } from './ListingsEditor';
+import { DemandBoard } from './DemandBoard';
 import { OrdersInbox } from './OrdersInbox';
 import { StockCard } from './StockEditor';
 
 export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Bootstrap; reloadBoot: () => void }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'stock' | 'listings' | 'orders'>('stock');
+  const [tab, setTab] = useState<'stock' | 'listings' | 'orders' | 'demand'>('stock');
   const { data: windows = [], reload: reloadWindows } = useWindows();
   const { data: orders = [], reload: reloadOrders } = useOrders();
-  const reload = () => { reloadBoot(); reloadWindows(); reloadOrders(); };
+  const { data: requests = [], reload: reloadRequests } = useRequests();
+  const reload = () => { reloadBoot(); reloadWindows(); reloadOrders(); reloadRequests(); };
+  const unanswered = requests.filter((r) => r.status === 'open' && !r.bids.some((b) => b.status === 'open')).length;
   const waiting = orders.filter((o) => o.status === 'placed').length;
 
   const products = new Map(boot.products.map((p) => [p.id, p]));
@@ -39,15 +43,19 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
       </div>
 
       <div role="tablist" className="mb-4 flex gap-2 border-b-2 border-gold">
-        {(['stock', 'listings', 'orders'] as const).map((k) => (
+        {(['stock', 'listings', 'orders', 'demand'] as const).map((k) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
             className={`rounded-t px-4 py-2 font-semibold ${tab === k ? 'bg-brand text-white' : 'text-brand hover:bg-brand-light'}`}>
-            {k === 'orders' ? `${t('inboxTab')}${waiting ? ` (${waiting})` : ''}` : t(k === 'stock' ? 'tabStock' : 'tabListings')}
+            {k === 'orders' ? `${t('inboxTab')}${waiting ? ` (${waiting})` : ''}` : k === 'demand' ? `${t('demandTab')}${unanswered ? ` (${unanswered})` : ''}` : t(k === 'stock' ? 'tabStock' : 'tabListings')}
           </button>
         ))}
       </div>
 
-      {tab === 'orders' ? (
+      {tab === 'demand' ? (
+        capabilities(boot.config).showDemandBoard
+          ? <DemandBoard producerId={me.id} boot={boot} requests={requests} reload={reload} />
+          : <p className="text-slate-600">{t('commitmentsSoon')}</p>
+      ) : tab === 'orders' ? (
         <OrdersInbox orders={orders} boot={boot} reload={reload} />
       ) : tab === 'stock' ? (
         <div className="space-y-4">
