@@ -207,3 +207,34 @@ export function localStatus(c: ModelConfig, categoryMaxKm: number, driveKm: numb
   if (driveKm <= rangeKm(c, categoryMaxKm)) return 'ok';
   return c.localRange === 'warn' ? 'warn' : 'hidden';
 }
+
+/** Ready-made combinations of the switches, for starting a conversation about a whole way of working. */
+export type Preset = { id: string; label: Bilingual; explain: Bilingual; config: Partial<ModelConfig> };
+export const PRESETS: Preset[] = [
+  {
+    id: 'marketplace',
+    label: { en: 'Simple marketplace', cy: 'Marchnad syml' },
+    explain: { en: 'Producers list stock; buyers order; producers confirm; each delivers their own.', cy: 'Cynhyrchwyr yn rhestru stoc; prynwyr yn archebu; cynhyrchwyr yn cadarnhau; pob un yn dosbarthu ei hun.' },
+    config: {},
+  },
+  {
+    id: 'hub',
+    label: { en: 'Food hub', cy: 'Canolfan fwyd' },
+    explain: { en: 'The network consolidates: one invoice, one hub courier round, verified members.', cy: 'Mae’r rhwydwaith yn cyfuno: un anfoneb, un rownd negesydd, aelodau wedi’u gwirio.' },
+    config: { operator: 'hub', delivery: 'hub_courier', trust: 'badges' },
+  },
+  {
+    id: 'demand-led',
+    label: { en: 'Demand-led', cy: 'Wedi’i arwain gan alw' },
+    explain: { en: 'Buyers ask, producers bid; pooled demand; producer rounds by area.', cy: 'Prynwyr yn gofyn, cynhyrchwyr yn cynnig; galw cyfun; rowndiau cynhyrchwyr yn ôl ardal.' },
+    config: { market: 'rfq', speculative: 'pooled', delivery: 'area_days' },
+  },
+  {
+    id: 'instant',
+    label: { en: 'Instant checkout', cy: 'Desg dalu ar unwaith' },
+    explain: { en: 'Orders are accepted automatically and stock drops at once; forecast can be fully ordered.', cy: 'Derbynnir archebion yn awtomatig ac mae’r stoc yn gostwng ar unwaith; gellir archebu’r rhagolwg yn llawn.' },
+    config: { stockTrigger: 'on_place', forecastOrdering: 'full_forecast' },
+  },
+];
+
+export const presetConfig = (p: Preset): ModelConfig => sanitiseConfig(p.config as Record<string, unknown>, DEFAULT_CONFIG);

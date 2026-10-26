@@ -4,18 +4,22 @@ import type { Persona } from '../../shared/types';
 import { useActivity, useOrders, useRequests, type Bootstrap } from '../api';
 import { EventList } from './EventsPanel';
 import { ModelLab } from './ModelLab';
+import { FeedbackList } from './FeedbackList';
 import { Overview } from './Overview';
+import { ScenarioLauncher } from './ScenarioLauncher';
+import { useScreen } from '../screen';
 import { RunSheet } from './RunSheet';
 
-type Tab = 'lab' | 'overview' | 'runs' | 'activity';
+type Tab = 'lab' | 'scenarios' | 'overview' | 'runs' | 'activity' | 'feedback';
 
 export function OperatorHome({ boot, personas, reload }: { boot: Bootstrap; personas: Persona[]; reload: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('lab');
+  useScreen(`operator/${tab}`);
   const { data: orders = [] } = useOrders();
   const { data: activity = [] } = useActivity();
   const { data: requests = [] } = useRequests();
-  const tabs: [Tab, string][] = [['lab', t('labTab')], ['overview', t('overviewTab')], ['runs', t('runsTab')], ['activity', t('activityTab')]];
+  const tabs: [Tab, string][] = [['lab', t('labTab')], ['scenarios', t('scenariosTab')], ['overview', t('overviewTab')], ['runs', t('runsTab')], ['activity', t('activityTab')], ['feedback', t('feedbackTab')]];
   return (
     <div>
       <div role="tablist" className="mb-4 flex gap-2 border-b-2 border-gold">
@@ -25,6 +29,8 @@ export function OperatorHome({ boot, personas, reload }: { boot: Bootstrap; pers
         ))}
       </div>
       {tab === 'lab' && <ModelLab boot={boot} personas={personas} reload={reload} />}
+      {tab === 'scenarios' && <ScenarioLauncher />}
+      {tab === 'feedback' && <FeedbackList />}
       {tab === 'overview' && <Overview orders={orders} requests={requests} boot={boot} />}
       {tab === 'runs' && (
         <div className="space-y-3">

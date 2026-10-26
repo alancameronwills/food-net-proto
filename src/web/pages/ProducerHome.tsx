@@ -7,6 +7,7 @@ import { useOrders, useRequests, useWindows, type Bootstrap } from '../api';
 import { capabilities } from '../../shared/models';
 import { loc } from '../i18n';
 import { ListingsEditor } from './ListingsEditor';
+import { useScreen } from '../screen';
 import { DemandBoard } from './DemandBoard';
 import { OrdersInbox } from './OrdersInbox';
 import { StockCard } from './StockEditor';
@@ -14,6 +15,7 @@ import { StockCard } from './StockEditor';
 export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Bootstrap; reloadBoot: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'stock' | 'listings' | 'orders' | 'demand'>('stock');
+  useScreen(`producer/${tab}`);
   const { data: windows = [], reload: reloadWindows } = useWindows();
   const { data: orders = [], reload: reloadOrders } = useOrders();
   const { data: requests = [], reload: reloadRequests } = useRequests();

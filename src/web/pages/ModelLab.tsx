@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DIMENSIONS, type ModelConfig } from '../../shared/models';
+import { DIMENSIONS, PRESETS, presetConfig, type ModelConfig } from '../../shared/models';
 import type { Persona } from '../../shared/types';
 import { api, ctx, type Bootstrap } from '../api';
 import { WEEKDAYS } from '../../shared/delivery';
@@ -28,6 +28,20 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
         <h1 className="text-2xl font-bold text-brand">{t('modelLab')}</h1>
         <p className="text-slate-600">{t('modelLabIntro')}</p>
       </div>
+
+      <section data-testid="presets">
+        <h2 className="text-lg font-semibold text-brand-dark">{t('presetsTitle')}</h2>
+        <p className="mb-2 text-sm text-slate-600">{t('presetsHint')}</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {PRESETS.map((p) => (
+            <button key={p.id} data-testid={`preset-${p.id}`} onClick={() => change(presetConfig(p))}
+              className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm hover:border-brand hover:shadow-md">
+              <div className="font-semibold text-brand">{loc(p.label)}</div>
+              <div className="mt-1 text-xs text-slate-600">{loc(p.explain)}</div>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-4 md:grid-cols-2">
         {DIMENSIONS.map((d) => {

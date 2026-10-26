@@ -4,6 +4,7 @@ import type { Persona } from '../../shared/types';
 import { useOrders, useRequests, useWindows, type Bootstrap } from '../api';
 import { capabilities } from '../../shared/models';
 import { useCart } from '../cart';
+import { useScreen } from '../screen';
 import { Browse } from './Browse';
 import { CartPanel } from './CartPanel';
 import { MyOrders } from './MyOrders';
@@ -16,6 +17,7 @@ export function BuyerHome({ me, boot }: { me: Persona; boot: Bootstrap }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('browse');
   const [search, setSearch] = useState('');
+  useScreen(`buyer/${tab}`);
   const { cart, setDate, setQty, keepOnly } = useCart(me.id);
   const { data: windows = [], reload: reloadWindows } = useWindows();
   const { data: orders = [], reload: reloadOrders } = useOrders();

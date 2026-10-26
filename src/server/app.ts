@@ -7,6 +7,8 @@ import {
 import type { Organisation, Persona } from '../shared/types';
 import { cancelOrder, confirmOrder, declineOrder, deliverOrder, dismissFlags, listOrders, pickOrder, placeOrders } from './orders';
 import { acceptBid, closeRequest, createRequest, listRequests, placeBid, takeRequest, withdrawBid } from './requests';
+import { clearFeedback, listFeedback, postFeedback } from './feedback';
+import { activeScenario, endScenario, startScenario } from './scenarios';
 import { markAllRead, notificationsFor, recentActivity } from './events';
 import { reliabilityFor } from '../shared/reliability';
 import { addListing, addWeeks, removeListing, removeWindow, updateListing, upsertWindow, type Result } from './producer';
@@ -110,6 +112,14 @@ app.post('/notifications/read', async (c) => {
   return c.json({ ok: true });
 });
 app.get('/activity', async (c) => c.json(await recentActivity(c.get('s'))));
+
+// Guided scenarios and feedback.
+app.get('/scenario', async (c) => c.json({ active: await activeScenario(c.get('s')) }));
+app.post('/admin/scenario', async (c) => reply(c, await startScenario(c.get('s'), c.get('persona'), (await jsonBody(c)).id)));
+app.delete('/admin/scenario', async (c) => reply(c, await endScenario(c.get('s'), c.get('persona'))));
+app.post('/feedback', async (c) => reply(c, await postFeedback(c.get('s'), c.get('persona'), await jsonBody(c))));
+app.get('/feedback', async (c) => reply(c, await listFeedback(c.get('s'), c.get('persona'))));
+app.delete('/feedback', async (c) => reply(c, await clearFeedback(c.get('s'), c.get('persona'))));
 
 app.get('/config', async (c) => c.json(await getConfig(c.get('s'))));
 

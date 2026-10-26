@@ -20,11 +20,12 @@ It is written for a Zoom session where a few people role-play, but works in a ro
 | Speculative orders: buyers ask for something not yet listed; producers bid (or accept a price); three models | Working |
 | Notifications (bell) and a network-wide activity feed | Working |
 | Operator: Model Lab (8 switchable rules), orders & metrics overview, role links, reset | Working |
+| Delivery models: producers deliver / area rounds / hub courier; delivery-day strip; run sheets; operator delivery runs | Working |
+| Guided scenarios with a live checklist, model presets, feedback box (with CSV export) | Working |
 | Standing orders (forward-commitment model) | **Not built yet** |
-| Delivery slots, area delivery days, hub courier runs | **Not built yet** (the Delivery switch is selectable but has no effect yet) |
-| Guided scenario scripts, in-app feedback box, email notifications | **Not built yet** |
+| Email notifications | **Not built yet** (in-app only) |
 
-Say plainly what isn't there yet: *"Regular standing orders and the detail of delivery runs are the next pieces."*
+Say plainly what isn't there yet: *"Regular standing orders are the next piece."*
 
 ## Before the session (15 minutes)
 
@@ -44,7 +45,10 @@ Say plainly what isn't there yet: *"Regular standing orders and the detail of de
 5. **Check** that each helper's link opens straight into their role, and that changes by one helper appear on
    another's screen within a few seconds. Zoom tip: use a large browser window, and share a single browser window
    rather than the whole screen.
-6. Tell everyone about the **bell** (their own notifications) and the **Network activity** button (what is happening
+6. **Optional: run it as a guided scenario.** In the operator view open **Scenarios** and press **Start** on one (see
+   "Guided scenarios" below). Everyone in the session then sees a slim bar along the bottom with the current step,
+   a **Play as** button for the role it needs, and the full list under **All steps**.
+7. Tell everyone about the **bell** (their own notifications) and the **Network activity** button (what is happening
    anywhere in the session). On Zoom, the activity feed is how the audience follows actions on other people's screens.
 
 If a role-player gets lost: **Switch role** (top right) returns to the picker. The **Cymraeg / English** button
@@ -52,7 +56,7 @@ switches language on any screen.
 
 ## The sequence
 
-About 55 minutes plus discussion; a **30-minute version** is marked below (sections 2, 3 and 5 only). The order is
+About 55 minutes plus discussion; a **30-minute version** is marked below (sections 2, 3 and 5 only), or run two or three guided scenarios instead. The order is
 deliberate: start with the producer's world (supply is what makes the network useful), then the buyer's view and
 ordering, then the delivery, then asking for things nobody lists yet, then the rules.
 
@@ -158,10 +162,13 @@ change one switch at a time, and ask for reactions.
 | **Local range** | *Per-product distance*, *Warn only*, *Flat radius* (drag the slider) | Far-away offers hide, appear with a warning, or the whole list changes with one radius | Should "local" be strict or advisory? |
 | **Pricing** | *Volume tiers*; as the producer add a price break to a listing | Buyers see *"50+ at £0.80"* and the basket price drops when the quantity passes the break | Do bigger orders deserve a better price? |
 | **Trust display** | *Reliability score*, *Verified badges*, *Hidden* | The chip beside every producer changes | Do you want to see scores, or just know someone is vetted? |
+| **Delivery** | *Producer delivers* → *Area delivery days* → *Hub courier* | The strip of delivery days above Browse changes: under *Area days* each producer only goes to your area on its published round (shown on each product); under *Hub courier* only the hub days work, and the operator can tick which days in the Model Lab. Orders say who delivers. Producers get a **run sheet**; the operator's **Delivery runs** tab shows how many drops a hub round saves | Would you accept fewer delivery days for lower delivery cost? Who should run the hub courier? |
 
-**Market structure** *(forward commitment)* and **Delivery** are selectable and each has a one-line explanation. Read
-the explanations aloud and note which options people like, but tell the audience their effect appears once those
-features are built.
+**Market structure** *(forward commitment)* is selectable and has a one-line explanation, but standing orders are not
+built yet; say so.
+
+**Presets** at the top of the Model Lab set several switches at once (*Simple marketplace*, *Food hub*, *Demand-led*,
+*Instant checkout*). They are a quick way to put a whole way of working in front of people; adjust any switch afterwards.
 
 Also show the **Orders & metrics** tab: every order and request in the session, local spend and fill rate.
 
@@ -175,6 +182,37 @@ Between changes, say: *"None of this is final. You're helping decide how this wo
   screenshot of the Model Lab before you finish).
 - Say what happens next, and how people can take part.
 
+## Guided scenarios
+
+Instead of improvising, the operator can start a scripted demonstration from **Scenarios**. Starting one **resets the
+session** (after a confirmation), sets the model settings it needs, and pre-arranges the situation where necessary.
+Then everyone sees the checklist; steps **tick themselves** when the matching thing happens anywhere in the session,
+or you press **Mark done** for steps that are only about looking at something. **Play as** switches you to the role a
+step needs, which also works for a single presenter hopping between roles.
+
+| Scenario | What it shows | Pre-arranged |
+|---|---|---|
+| Plan next week's menu | Menu planner, forecast vs in stock, ordering ahead | nothing |
+| Watch the stock go down | Order, confirm, producer's available stock falling | nothing |
+| The forecast is cut | Producer cuts a forecast; buyers are warned and offered alternatives; flags clear when it is restored | two buyers already hold orders in a forecast week |
+| Ask for something not yet available | Request, two bids, accept; the second producer gains a listing | nothing |
+| A basket from several producers | One checkout, one order per producer; one invoice under the food hub | nothing |
+| A short delivery | Delivered short, lower total, reliability score moves | an order is waiting to be delivered |
+| Who brings it? | Producer delivery, area rounds and hub courier compared | nothing |
+| A standing weekly order | Listed, but greyed out: standing orders are not built yet | |
+
+Each scenario can be run under different models afterwards: change a switch and repeat a step to compare.
+
+## The feedback box
+
+Every screen has a **Feedback** button (bottom right). A comment, with an optional thumbs up or down, is saved with the
+**screen** it was given on, who gave it, the **scenario** running, and **all the model settings in force** at that moment.
+So "I'd want one invoice" can be read against the fact that the Food hub model was on.
+
+The operator reads them under **Feedback**, can **Download CSV** (one row per comment, one column per model switch)
+and **Clear all**. Feedback survives **Reset demo data** and starting a scenario, so a whole day of demos accumulates
+in one place. Ask people to use it during the session rather than afterwards.
+
 ## Questions to put to the audience
 
 **Producers**
@@ -182,7 +220,7 @@ Between changes, say: *"None of this is final. You're helping decide how this wo
 - Would you manage stock yourself in an app like this? On phone or computer?
 - Would you accept every order automatically, or want to approve each one?
 - Would you bid for a buyer's request? Do you want to see what rivals offered?
-- Who delivers today, and how far do you go? Would you share delivery runs with others?
+- Who delivers today, and how far do you go? Would you deliver on fixed weekly rounds to an area, or hand goods to a shared hub courier?
 
 **Buyers**
 - How far ahead do you plan menus, and would you commit to orders that early?
@@ -190,6 +228,7 @@ Between changes, say: *"None of this is final. You're helping decide how this wo
 - Would you ask producers for things they don't list yet? Would you name your price?
 - Would you prefer one invoice and one delivery (a food hub) or separate dealings with each producer?
 - What would you do if a producer let you down on a delivery?
+- Would you accept fewer delivery days if it meant one drop a day from the network?
 
 ## Resetting and running a second demo
 
@@ -209,6 +248,8 @@ Between changes, say: *"None of this is final. You're helping decide how this wo
 | Wrong language | **Cymraeg / English** button |
 | A product says "Not delivered on this day" | Each category has delivery days (cheese Wednesday; most others Tue/Thu/Fri/Sat). Change the delivery date |
 | A request is refused ("not delivered on that day", "notice") | The same delivery-day and notice rules apply; pick another date |
+| Everything is "not delivered" on most days | You are on *Area delivery days* or *Hub courier*: only the producer rounds or hub days work. Use the strip of days, or switch the Delivery model back |
+| The scenario bar is in the way | Press **Hide** (it becomes a small pill); **All steps** opens the list; **End scenario** (operator) removes it |
 | Bidding is missing | You are on *First to accept*: producers accept the buyer's price instead of bidding |
 | "Reset" did not clear a buyer's basket | The basket is kept in that browser; remove the lines or clear it |
 | The numbers differ from this guide | The examples come from the current sample data in `data/organisations.json`; if you have edited it, check which businesses and distances apply |

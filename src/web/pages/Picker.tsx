@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import type { Persona, Role } from '../../shared/types';
 import { loc } from '../i18n';
+import { useScreen } from '../screen';
 
 export function Picker({ personas, onPick }: { personas: Persona[]; onPick: (p: Persona) => void }) {
   const { t } = useTranslation();
+  useScreen('role picker');
   const groups: [Role, string][] = [['buyer', t('buyers')], ['producer', t('producers')], ['operator', t('operatorRole')]];
   return (
     <div>

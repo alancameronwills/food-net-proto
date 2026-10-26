@@ -105,6 +105,13 @@ const en = {
   runSheetTitle: 'Delivery run sheet', runSheetNone: 'Nothing to deliver yet. Confirmed orders appear here by date.', runStopArea: 'Area', hubCollects: 'Collected by the hub courier the day before',
   runsTab: 'Delivery runs', runsIntro: 'Everything confirmed and still to deliver, by date and buyer.', dropsSeparate: '{{n}} drops if every producer delivers separately', dropsHub: '{{n}} drops with one round per buyer',
   hubDaysLabel: 'Hub courier days', hubDaysHint: 'Days the hub courier makes deliveries; orders need {{n}} days’ notice.', fromProducer: 'from {{name}}', dayCol: 'Day',
+  scenarioSteps: 'All steps', scenarioLabel: 'Scenario', scenarioProgress: '{{a}} of {{b}} done', playAs: 'Play as {{name}}', openOperator: 'Open the operator view', markDone: 'Mark done', endScenario: 'End scenario', hidePanel: 'Hide', youAreHere: 'You are playing this',
+  scenariosTab: 'Scenarios', scenariosIntro: 'Guided demonstrations. Starting one resets this session and sets up the situation; everyone then sees the steps.',
+  startScenario: 'Start', confirmStartScenario: 'Starting a scenario resets this session: orders, requests, stock and model settings. Continue?', scenarioRunning: 'Running now', stepsCount: '{{n}} steps', scenarioStarted: 'Scenario started. Everyone in this session now sees its steps.',
+  feedbackBtn: 'Feedback', feedbackTitle: 'What do you think?', feedbackHint: 'Your comment is saved with this screen and the current model settings.', feedbackPlaceholder: 'What worked, what did not, what would you change?',
+  feedbackSend: 'Send', feedbackThanks: 'Thank you, that has been saved.', feedbackTab: 'Feedback', feedbackNone: 'No feedback yet.', feedbackDownload: 'Download CSV', feedbackClear: 'Clear all', feedbackConfirmClear: 'Delete all feedback for this session?',
+  feedbackWho: 'Who', feedbackScreen: 'Screen', feedbackModel: 'Model', feedbackComment: 'Comment', feedbackWhen: 'When', feedbackScenarioCol: 'Scenario', thumbsUp: 'Good', thumbsDown: 'Not good',
+  presetsTitle: 'Start from a preset', presetsHint: 'Sets several switches at once; adjust any of them afterwards.', applyPreset: 'Apply',
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
 };
 const cy: typeof en = {
@@ -209,6 +216,13 @@ const cy: typeof en = {
   runSheetTitle: 'Taflen rownd ddosbarthu', runSheetNone: 'Dim i’w ddosbarthu eto. Mae archebion wedi’u cadarnhau yn ymddangos yma yn ôl dyddiad.', runStopArea: 'Ardal', hubCollects: 'Wedi’i gasglu gan negesydd y ganolfan y diwrnod cynt',
   runsTab: 'Rowndiau dosbarthu', runsIntro: 'Popeth sydd wedi’i gadarnhau ac i’w ddosbarthu o hyd, yn ôl dyddiad a phrynwr.', dropsSeparate: '{{n}} arhosiad os yw pob cynhyrchydd yn dosbarthu ar wahân', dropsHub: '{{n}} arhosiad gydag un rownd i bob prynwr',
   hubDaysLabel: 'Diwrnodau negesydd y ganolfan', hubDaysHint: 'Diwrnodau pan fydd negesydd y ganolfan yn dosbarthu; mae archebion angen {{n}} diwrnod o rybudd.', fromProducer: 'gan {{name}}', dayCol: 'Diwrnod',
+  scenarioSteps: 'Pob cam', scenarioLabel: 'Senario', scenarioProgress: '{{a}} o {{b}} wedi’u gwneud', playAs: 'Chwarae fel {{name}}', openOperator: 'Agor golwg y gweithredwr', markDone: 'Nodi wedi’i wneud', endScenario: 'Gorffen y senario', hidePanel: 'Cuddio', youAreHere: 'Rydych chi’n chwarae hwn',
+  scenariosTab: 'Senarios', scenariosIntro: 'Arddangosiadau dan arweiniad. Mae dechrau un yn ailosod y sesiwn hon ac yn sefydlu’r sefyllfa; yna mae pawb yn gweld y camau.',
+  startScenario: 'Dechrau', confirmStartScenario: 'Mae dechrau senario yn ailosod y sesiwn hon: archebion, ceisiadau, stoc a gosodiadau’r model. Parhau?', scenarioRunning: 'Yn rhedeg nawr', stepsCount: '{{n}} cam', scenarioStarted: 'Senario wedi dechrau. Mae pawb yn y sesiwn hon bellach yn gweld ei gamau.',
+  feedbackBtn: 'Adborth', feedbackTitle: 'Beth yw eich barn?', feedbackHint: 'Caiff eich sylw ei gadw gyda’r sgrin hon a gosodiadau cyfredol y model.', feedbackPlaceholder: 'Beth weithiodd, beth na weithiodd, beth fyddech chi’n ei newid?',
+  feedbackSend: 'Anfon', feedbackThanks: 'Diolch, mae hynny wedi’i gadw.', feedbackTab: 'Adborth', feedbackNone: 'Dim adborth eto.', feedbackDownload: 'Lawrlwytho CSV', feedbackClear: 'Clirio popeth', feedbackConfirmClear: 'Dileu’r holl adborth ar gyfer y sesiwn hon?',
+  feedbackWho: 'Pwy', feedbackScreen: 'Sgrin', feedbackModel: 'Model', feedbackComment: 'Sylw', feedbackWhen: 'Pryd', feedbackScenarioCol: 'Senario', thumbsUp: 'Da', thumbsDown: 'Ddim yn dda',
+  presetsTitle: 'Dechrau o osodiad parod', presetsHint: 'Yn gosod sawl switsh ar unwaith; addaswch unrhyw un ohonynt wedyn.', applyPreset: 'Gosod',
   units: { litre: 'litr', kg: 'kg', dozen: 'dwsin', loaf: 'torth', each: 'yr un', crate: 'cawell' },
 };
 

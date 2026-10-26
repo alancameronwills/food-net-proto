@@ -10,6 +10,8 @@ import { BuyerHome } from './pages/BuyerHome';
 import { ProducerHome } from './pages/ProducerHome';
 import { OperatorHome } from './pages/OperatorHome';
 import { EventsPanel } from './pages/EventsPanel';
+import { FeedbackBox } from './pages/FeedbackBox';
+import { ScenarioPanel } from './pages/ScenarioPanel';
 
 const ROLE_COLOUR = { buyer: 'bg-brand', producer: 'bg-emerald-700', operator: 'bg-slate-800' } as const;
 
@@ -28,7 +30,7 @@ export function App() {
       .join(' · ');
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-28">
       <header className="bg-brand text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
           <Link to="/" className="flex items-center gap-2 text-xl font-bold">
@@ -81,6 +83,8 @@ export function App() {
           </Routes>
         )}
       </main>
+      <ScenarioPanel personas={personas} me={me} />
+      <FeedbackBox signedIn={!!me} />
     </div>
   );
 }
