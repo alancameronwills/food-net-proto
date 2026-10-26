@@ -8,10 +8,14 @@ test.describe('when something goes wrong', () => {
     const s = newSession();
     // Simulate bad data: the delivery model is the hub courier but the hub days are missing
     await page.route('**/api/bootstrap', async (route) => {
-      const res = await route.fetch();
-      const body = await res.json();
-      body.config = { ...body.config, delivery: 'hub_courier', hubDays: undefined };
-      await route.fulfill({ response: res, json: body });
+      try {
+        const res = await route.fetch();
+        const body = await res.json();
+        body.config = { ...body.config, delivery: 'hub_courier', hubDays: undefined };
+        await route.fulfill({ response: res, json: body });
+      } catch {
+        /* the test ended while a poll was in flight */
+      }
     });
     await page.goto(`/lab?s=${s}&as=operator`);
     const crash = page.getByTestId('crash');
