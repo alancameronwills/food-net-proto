@@ -1,6 +1,7 @@
 import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, BatchWriteCommand, DeleteCommand, UpdateCommand,
+  TransactWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
 
 export const TABLE = process.env.TABLE_NAME ?? 'bwyd-lleol';
@@ -99,6 +100,36 @@ export function session(id: string) {
         ExpressionAttributeValues: { ...Object.fromEntries(keys.map((k) => [`:s_${k}`, set[k]])), ...values },
       })));
     },
+    /** Atomically increment a counter and return the new value. */
+    async nextSeq(kind: string, sk: string): Promise<number> {
+      const r = await doc.send(new UpdateCommand({
+        TableName: TABLE, Key: { pk: P(kind), sk }, UpdateExpression: 'ADD #n :one',
+        ExpressionAttributeNames: { '#n': 'n' }, ExpressionAttributeValues: { ':one': 1 }, ReturnValues: 'UPDATED_NEW',
+      }));
+      return r.Attributes!.n as number;
+    },
+    /** Building blocks for `transact`: all-or-nothing writes across several items. */
+    tPut(kind: string, sk: string, data: object, condition?: string, names?: Record<string, string>, values?: Record<string, unknown>): TxItem {
+      return { Put: { TableName: TABLE, Item: { pk: P(kind), sk, ...data }, ConditionExpression: condition,
+        ExpressionAttributeNames: names, ExpressionAttributeValues: values } };
+    },
+    tUpdate(kind: string, sk: string, update: string, names: Record<string, string>, values: Record<string, unknown>, condition?: string): TxItem {
+      return { Update: { TableName: TABLE, Key: { pk: P(kind), sk }, UpdateExpression: update, ConditionExpression: condition,
+        ExpressionAttributeNames: names, ExpressionAttributeValues: values } };
+    },
+    /** Returns ok, or the index of the first item whose condition failed (-1 if it failed for another reason). */
+    async transact(items: TxItem[]): Promise<{ ok: true } | { ok: false; failedIndex: number }> {
+      try {
+        await doc.send(new TransactWriteCommand({ TransactItems: items as never }));
+        return { ok: true };
+      } catch (e) {
+        if ((e as Error).name === 'TransactionCanceledException') {
+          const reasons = (e as { CancellationReasons?: { Code?: string }[] }).CancellationReasons ?? [];
+          return { ok: false, failedIndex: reasons.findIndex((r) => r.Code === 'ConditionalCheckFailed') };
+        }
+        throw e;
+      }
+    },
     /** Delete an item if `condition` holds; returns whether it was deleted. */
     async removeIf(kind: string, sk: string, condition: string, names: Record<string, string>, values: Record<string, unknown>) {
       return condOk(() => doc.send(new DeleteCommand({
@@ -128,6 +159,7 @@ export function session(id: string) {
   };
 }
 export type Session = ReturnType<typeof session>;
+export type TxItem = Record<string, unknown>;
 
 async function condOk(f: () => Promise<unknown>): Promise<boolean> {
   try {

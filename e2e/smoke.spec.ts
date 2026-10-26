@@ -28,9 +28,9 @@ test('choosing a buyer shows local suppliers with distances', async ({ page }) =
   await page.evaluate(() => localStorage.removeItem('persona'));
   await page.reload();
   await page.getByRole('button', { name: /Grand Hotel/ }).click();
-  await expect(page.getByRole('heading', { name: 'Local suppliers near you' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Browse' })).toBeVisible();
   await expect(page.getByText('Playing as: Grand Hotel')).toBeVisible();
-  await expect(page.getByRole('cell', { name: /Welsh cheddar/ }).first()).toBeVisible();
+  await expect(page.locator('[data-testid^="offer-"]').first()).toBeVisible();
   await expect(page.getByText(/offers? hidden as out of local range/)).toBeVisible();
 });
 
@@ -85,8 +85,8 @@ test('only the operator may change the model', async ({ request }) => {
 
 test('Welsh toggle switches the interface language', async ({ page }) => {
   await page.goto(asBuyer(newSession()));
-  await expect(page.getByRole('heading', { name: 'Local suppliers near you' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Browse' })).toBeVisible();
   await page.getByRole('button', { name: 'Cymraeg' }).click();
-  await expect(page.getByRole('heading', { name: 'Cyflenwyr lleol yn agos atoch' })).toBeVisible();
-  await expect(page.getByRole('cell', { name: /Caws glas|Cheddar Cymreig/ }).first()).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Pori' })).toBeVisible();
+  await expect(page.getByText('Dyddiad dosbarthu').first()).toBeVisible();
 });

@@ -5,6 +5,7 @@ import {
   listWindows, resetSession, updateConfig,
 } from './store';
 import type { Organisation, Persona } from '../shared/types';
+import { cancelOrder, confirmOrder, declineOrder, listOrders, placeOrders } from './orders';
 import { addListing, addWeeks, removeListing, removeWindow, updateListing, upsertWindow, type Result } from './producer';
 
 type Env = { Variables: { s: Session; persona?: Organisation } };
@@ -72,6 +73,14 @@ app.put('/windows', async (c) => reply(c, await upsertWindow(c.get('s'), c.get('
 app.post('/windows/bulk', async (c) => reply(c, await addWeeks(c.get('s'), c.get('persona'), await jsonBody(c))));
 app.delete('/windows', async (c) =>
   reply(c, await removeWindow(c.get('s'), c.get('persona'), c.req.query('listingId') ?? '', c.req.query('start') ?? '')));
+
+// Orders: buyers place and cancel; producers confirm or decline; each sees only their own.
+app.get('/orders', async (c) => c.json(await listOrders(c.get('s'), c.get('persona'))));
+app.post('/orders', async (c) => reply(c, await placeOrders(c.get('s'), c.get('persona'), await jsonBody(c))));
+app.post('/orders/:id/confirm', async (c) => reply(c, await confirmOrder(c.get('s'), c.get('persona'), c.req.param('id'))));
+app.post('/orders/:id/decline', async (c) =>
+  reply(c, await declineOrder(c.get('s'), c.get('persona'), c.req.param('id'), (await jsonBody(c)).reason)));
+app.post('/orders/:id/cancel', async (c) => reply(c, await cancelOrder(c.get('s'), c.get('persona'), c.req.param('id'))));
 
 app.get('/config', async (c) => c.json(await getConfig(c.get('s'))));
 

@@ -66,3 +66,26 @@ export type SupplyWindow = {
 export type DriveDistances = Record<string, Record<string, number>>; // km, orgId -> orgId -> km
 
 export type Persona = Pick<Organisation, 'id' | 'role' | 'name' | 'kind' | 'town' | 'blurb'>;
+
+/** declined = producer said no; cancelled = buyer (or operator) withdrew. */
+export type OrderStatus = 'placed' | 'confirmed' | 'declined' | 'cancelled';
+/** Whether the order currently holds stock: none, a soft hold awaiting confirmation, or firmly reserved. */
+export type StockState = 'none' | 'held' | 'reserved';
+
+export type OrderLine = { listingId: string; productId: string; qty: number; unitPrice: number };
+
+/** One order is always between one buyer and one producer; a checkout with several producers makes several orders sharing a groupId. */
+export type Order = {
+  id: string; // display reference, e.g. BL-1001
+  groupId: string;
+  buyerId: string;
+  producerId: string;
+  deliveryDate: string; // YYYY-MM-DD
+  status: OrderStatus;
+  stock: StockState;
+  lines: OrderLine[];
+  total: number;
+  note?: string;
+  createdAt: string; // ISO timestamp
+  history: { at: string; status: OrderStatus; by: string; note?: string }[];
+};

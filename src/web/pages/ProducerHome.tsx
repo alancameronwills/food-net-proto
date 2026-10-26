@@ -3,16 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { orderableQty } from '../../shared/browse';
 import { addDays, mondayOf, todayIso } from '../../shared/dates';
 import type { Persona } from '../../shared/types';
-import { useWindows, type Bootstrap } from '../api';
+import { useOrders, useWindows, type Bootstrap } from '../api';
 import { loc } from '../i18n';
 import { ListingsEditor } from './ListingsEditor';
+import { OrdersInbox } from './OrdersInbox';
 import { StockCard } from './StockEditor';
 
 export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Bootstrap; reloadBoot: () => void }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'stock' | 'listings'>('stock');
+  const [tab, setTab] = useState<'stock' | 'listings' | 'orders'>('stock');
   const { data: windows = [], reload: reloadWindows } = useWindows();
-  const reload = () => { reloadBoot(); reloadWindows(); };
+  const { data: orders = [], reload: reloadOrders } = useOrders();
+  const reload = () => { reloadBoot(); reloadWindows(); reloadOrders(); };
+  const waiting = orders.filter((o) => o.status === 'placed').length;
 
   const products = new Map(boot.products.map((p) => [p.id, p]));
   const mine = boot.listings.filter((l) => l.producerId === me.id);
@@ -23,12 +26,11 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
   const monday = mondayOf(todayIso());
   const soon = myWindows.filter((w) => w.start >= monday && w.start < addDays(monday, 28));
   const orderableProducts = mine.filter((l) => soon.some((w) => w.listingId === l.id && orderableQty(boot.config, w) > 0)).length;
-  const weeksWithOrders = myWindows.filter((w) => w.qtyReserved > 0).length;
 
   return (
     <div>
       <div className="mb-4 grid grid-cols-3 gap-3">
-        {([[t('summaryListings'), mine.length], [t('summaryNext4'), `${orderableProducts} / ${mine.length}`], [t('summaryReserved'), weeksWithOrders]] as const).map(([label, value]) => (
+        {([[t('summaryListings'), mine.length], [t('summaryNext4'), `${orderableProducts} / ${mine.length}`], [t('ordersWaitingTile'), waiting]] as const).map(([label, value]) => (
           <div key={label} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <div className="text-2xl font-bold text-brand">{value}</div>
             <div className="text-xs text-slate-600">{label}</div>
@@ -37,15 +39,17 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
       </div>
 
       <div role="tablist" className="mb-4 flex gap-2 border-b-2 border-gold">
-        {(['stock', 'listings'] as const).map((k) => (
+        {(['stock', 'listings', 'orders'] as const).map((k) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
             className={`rounded-t px-4 py-2 font-semibold ${tab === k ? 'bg-brand text-white' : 'text-brand hover:bg-brand-light'}`}>
-            {t(k === 'stock' ? 'tabStock' : 'tabListings')}
+            {k === 'orders' ? `${t('inboxTab')}${waiting ? ` (${waiting})` : ''}` : t(k === 'stock' ? 'tabStock' : 'tabListings')}
           </button>
         ))}
       </div>
 
-      {tab === 'stock' ? (
+      {tab === 'orders' ? (
+        <OrdersInbox orders={orders} boot={boot} reload={reload} />
+      ) : tab === 'stock' ? (
         <div className="space-y-4">
           {mine.length === 0 && <p className="text-slate-600">{t('noListings')}</p>}
           {mine.map((l) => (

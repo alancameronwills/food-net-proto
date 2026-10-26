@@ -1,4 +1,5 @@
-import { capabilities, localStatus, type ModelConfig } from './models';
+import { localStatus, type ModelConfig } from './models';
+import { reservableLimit } from './orders';
 import type { Category, DriveDistances, Listing, Organisation, Product, SupplyWindow } from './types';
 
 export type Offer = {
@@ -37,13 +38,9 @@ export function offersFor(
 }
 
 /**
- * Quantity buyers may order from a window under the active model: all free stock when in stock,
+ * Quantity buyers may still order from a window under the active model: all free stock when in stock,
  * a share of forecast (per the forecast-ordering model), and nothing while provisional.
  */
 export function orderableQty(config: ModelConfig, w: SupplyWindow): number {
-  const free = Math.max(0, w.qtyTotal - w.qtyReserved);
-  if (w.confidence === 'in_stock') return free;
-  if (w.confidence === 'provisional') return 0;
-  const cap = capabilities(config).forecastCap;
-  return Math.max(0, Math.min(free, Math.floor(w.qtyTotal * cap) - w.qtyReserved));
+  return Math.max(0, reservableLimit(config, w) - w.qtyReserved);
 }

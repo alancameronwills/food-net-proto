@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Category, DriveDistances, Listing, Organisation, Persona, Product, SupplyWindow } from '../shared/types';
+import type { Category, DriveDistances, Listing, Order, Organisation, Persona, Product, SupplyWindow } from '../shared/types';
 import type { ModelConfig } from '../shared/models';
 
 export type Bootstrap = {
@@ -53,4 +53,5 @@ export function usePolled<T>(path: string, ms = 3000) {
 
 export const useBootstrap = () => usePolled<Bootstrap>('/bootstrap');
 export const useWindows = () => usePolled<SupplyWindow[]>('/windows', 5000);
+export const useOrders = () => usePolled<Order[]>('/orders', 3000);
 export const fetchPersonas = () => api<Persona[]>('/personas');

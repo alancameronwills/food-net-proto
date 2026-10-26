@@ -85,8 +85,9 @@ test.describe('producer: listings', () => {
     const producer = await person(browser, producerUrl(s));
     const buyer = await person(browser, `/home?s=${s}&as=harbour-bistro`);
     try {
-      const dyfedLamb = buyer.page.getByRole('row').filter({ hasText: 'Dyfed Dairy' }).filter({ hasText: 'lamb' });
-      await expect(buyer.page.getByRole('heading', { name: 'Local suppliers near you' })).toBeVisible();
+      const dyfedLamb = buyer.page.getByTestId('offer-dyfed-dairy:meat-lamb');
+      await expect(buyer.page.getByRole('tab', { name: 'Browse' })).toBeVisible();
+      await buyer.page.getByLabel('Only what I can order').uncheck(); // a brand-new listing has no supply yet
       await expect(dyfedLamb).toHaveCount(0);
 
       await producer.page.getByRole('tab', { name: 'My listings' }).click();
@@ -113,14 +114,14 @@ test.describe('producer: listings', () => {
     const producer = await person(browser, producerUrl(s));
     const buyer = await person(browser, `/home?s=${s}&as=harbour-bistro`);
     try {
+      await buyer.page.getByLabel('Only what I can order').uncheck();
       await producer.page.getByRole('tab', { name: 'My listings' }).click();
       const row = producer.page.getByTestId('listing-dyfed-dairy:cheese-cheddar');
       await row.getByRole('button', { name: 'Edit' }).click();
       await producer.page.getByLabel(/Price per unit/).fill('14.80');
       await producer.page.getByRole('button', { name: 'Save' }).click();
       await expect(row).toContainText('£14.80');
-      await expect(buyer.page.getByRole('row').filter({ hasText: 'Dyfed Dairy' }).filter({ hasText: 'Welsh cheddar' }))
-        .toContainText('£14.80', { timeout: 10_000 });
+      await expect(buyer.page.getByTestId('offer-dyfed-dairy:cheese-cheddar')).toContainText('£14.80', { timeout: 10_000 });
     } finally {
       await producer.close();
       await buyer.close();
