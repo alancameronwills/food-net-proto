@@ -63,6 +63,21 @@ export function session(id: string) {
       } while (key);
       return items;
     },
+    /** Write only if absent (or past its `expires` epoch-ms); returns whether this caller won. */
+    async putIfAbsent(kind: string, sk: string, data: { expires: number } & object): Promise<boolean> {
+      try {
+        await doc.send(new PutCommand({
+          TableName: TABLE,
+          Item: { pk: P(kind), sk, ...data },
+          ConditionExpression: 'attribute_not_exists(pk) OR expires < :now',
+          ExpressionAttributeValues: { ':now': Date.now() },
+        }));
+        return true;
+      } catch (e) {
+        if ((e as Error).name === 'ConditionalCheckFailedException') return false;
+        throw e;
+      }
+    },
     async remove(kind: string, sk: string) {
       await doc.send(new DeleteCommand({ TableName: TABLE, Key: { pk: P(kind), sk } }));
     },

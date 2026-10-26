@@ -16,8 +16,9 @@ export function App() {
   const { t, i18n } = useTranslation();
   const nav = useNavigate();
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [personasLoaded, setPersonasLoaded] = useState(false);
   const boot = useBootstrap();
-  useEffect(() => { void fetchPersonas().then(setPersonas); }, []);
+  useEffect(() => { void fetchPersonas().then((p) => { setPersonas(p); setPersonasLoaded(true); }); }, []);
   const me = personas.find((p) => p.id === ctx.persona);
 
   const modelSummary = (b: Bootstrap) =>
@@ -60,17 +61,23 @@ export function App() {
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         {boot.error && <p className="mb-4 rounded bg-red-100 p-3 text-red-800">{t('error')} ({boot.error})</p>}
-        <Routes>
-          <Route path="/" element={<Picker personas={personas} onPick={(p) => { setPersona(p.id); nav('/home'); }} />} />
-          <Route path="/home" element={
-            !me ? <Navigate to="/" /> :
-            !boot.data ? <p>{t('loading')}</p> :
-            me.role === 'buyer' ? <BuyerHome me={me} boot={boot.data} /> :
-            me.role === 'producer' ? <ProducerHome me={me} boot={boot.data} /> :
-            <Navigate to="/lab" />
-          } />
-          <Route path="/lab" element={me?.role === 'operator' && boot.data ? <ModelLab boot={boot.data} personas={personas} reload={boot.reload} /> : <Navigate to="/" />} />
-        </Routes>
+        {!personasLoaded && !boot.error ? <p>{t('loading')}</p> : (
+          <Routes>
+            <Route path="/" element={<Picker personas={personas} onPick={(p) => { setPersona(p.id); nav('/home'); }} />} />
+            <Route path="/home" element={
+              !me ? <Navigate to="/" /> :
+              !boot.data ? <p>{t('loading')}</p> :
+              me.role === 'buyer' ? <BuyerHome me={me} boot={boot.data} /> :
+              me.role === 'producer' ? <ProducerHome me={me} boot={boot.data} /> :
+              <Navigate to="/lab" />
+            } />
+            <Route path="/lab" element={
+              me?.role !== 'operator' ? <Navigate to="/" /> :
+              !boot.data ? <p>{t('loading')}</p> :
+              <ModelLab boot={boot.data} personas={personas} reload={boot.reload} />
+            } />
+          </Routes>
+        )}
       </main>
     </div>
   );

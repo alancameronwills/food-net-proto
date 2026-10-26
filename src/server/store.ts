@@ -25,6 +25,28 @@ export async function isSeeded(s: Session): Promise<boolean> {
   return !!(await s.get('META', 'session'));
 }
 
+/**
+ * Seed a session on first use. Several role-players often open a fresh session at once, so a
+ * lock item (kept outside KINDS so `reset` doesn't clear it) lets exactly one request seed
+ * while the others wait for it to finish.
+ */
+export async function ensureSeeded(s: Session): Promise<void> {
+  if (await isSeeded(s)) return;
+  if (await s.putIfAbsent('LOCK', 'seed', { expires: Date.now() + 30_000 })) {
+    try {
+      if (!(await isSeeded(s))) await resetSession(s.id);
+    } finally {
+      await s.remove('LOCK', 'seed');
+    }
+    return;
+  }
+  for (let i = 0; i < 100; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    if (await isSeeded(s)) return;
+  }
+  throw new Error('Session seeding timed out');
+}
+
 export const getConfig = async (s: Session): Promise<ModelConfig> =>
   (await s.get<ModelConfig>('CONFIG', 'model')) ?? DEFAULT_CONFIG;
 

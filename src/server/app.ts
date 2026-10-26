@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { session, type Session } from './db';
 import {
-  getConfig, getDistances, isSeeded, listCategories, listListings, listOrgs, listProducts,
+  ensureSeeded, getConfig, getDistances, listCategories, listListings, listOrgs, listProducts,
   listWindows, resetSession, updateConfig,
 } from './store';
 import type { Organisation, Persona } from '../shared/types';
@@ -26,7 +26,7 @@ app.use('*', async (c, next) => {
   const id = c.req.header('x-session') ?? 'default';
   if (!SESSION_RE.test(id)) return c.json({ error: 'Invalid session id' }, 400);
   const s = session(id);
-  if (!(await isSeeded(s))) await resetSession(id); // first visit to a session seeds it
+  await ensureSeeded(s); // first visit to a session seeds it (once, even if several arrive together)
   c.set('s', s);
   const personaId = c.req.header('x-persona');
   if (personaId) c.set('persona', (await listOrgs(s)).find((o) => o.id === personaId));
