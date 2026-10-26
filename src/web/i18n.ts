@@ -112,6 +112,7 @@ const en = {
   feedbackSend: 'Send', feedbackThanks: 'Thank you, that has been saved.', feedbackTab: 'Feedback', feedbackNone: 'No feedback yet.', feedbackDownload: 'Download CSV', feedbackClear: 'Clear all', feedbackConfirmClear: 'Delete all feedback for this session?',
   feedbackWho: 'Who', feedbackScreen: 'Screen', feedbackModel: 'Model', feedbackComment: 'Comment', feedbackWhen: 'When', feedbackScenarioCol: 'Scenario', thumbsUp: 'Good', thumbsDown: 'Not good',
   presetsTitle: 'Start from a preset', presetsHint: 'Sets several switches at once; adjust any of them afterwards.', applyPreset: 'Apply',
+  crashTitle: 'This screen hit a problem', crashHint: 'Reloading usually fixes it. If it keeps happening, tell the person running the demo.', crashReload: 'Reload',
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
 };
 const cy: typeof en = {
@@ -223,6 +224,7 @@ const cy: typeof en = {
   feedbackSend: 'Anfon', feedbackThanks: 'Diolch, mae hynny wedi’i gadw.', feedbackTab: 'Adborth', feedbackNone: 'Dim adborth eto.', feedbackDownload: 'Lawrlwytho CSV', feedbackClear: 'Clirio popeth', feedbackConfirmClear: 'Dileu’r holl adborth ar gyfer y sesiwn hon?',
   feedbackWho: 'Pwy', feedbackScreen: 'Sgrin', feedbackModel: 'Model', feedbackComment: 'Sylw', feedbackWhen: 'Pryd', feedbackScenarioCol: 'Senario', thumbsUp: 'Da', thumbsDown: 'Ddim yn dda',
   presetsTitle: 'Dechrau o osodiad parod', presetsHint: 'Yn gosod sawl switsh ar unwaith; addaswch unrhyw un ohonynt wedyn.', applyPreset: 'Gosod',
+  crashTitle: 'Cafodd y sgrin hon broblem', crashHint: 'Fel arfer mae ail-lwytho yn ei drwsio. Os bydd yn parhau, dywedwch wrth y person sy’n rhedeg yr arddangosiad.', crashReload: 'Ail-lwytho',
   units: { litre: 'litr', kg: 'kg', dozen: 'dwsin', loaf: 'torth', each: 'yr un', crate: 'cawell' },
 };
 

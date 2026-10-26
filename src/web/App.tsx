@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DIMENSIONS } from '../shared/models';
 import type { Persona } from '../shared/types';
@@ -9,6 +9,7 @@ import { Picker } from './pages/Picker';
 import { BuyerHome } from './pages/BuyerHome';
 import { ProducerHome } from './pages/ProducerHome';
 import { OperatorHome } from './pages/OperatorHome';
+import { ErrorBoundary } from './ErrorBoundary';
 import { EventsPanel } from './pages/EventsPanel';
 import { FeedbackBox } from './pages/FeedbackBox';
 import { ScenarioPanel } from './pages/ScenarioPanel';
@@ -18,6 +19,7 @@ const ROLE_COLOUR = { buyer: 'bg-brand', producer: 'bg-emerald-700', operator: '
 export function App() {
   const { t, i18n } = useTranslation();
   const nav = useNavigate();
+  const location = useLocation();
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [personasLoaded, setPersonasLoaded] = useState(false);
   const boot = useBootstrap();
@@ -65,6 +67,7 @@ export function App() {
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         {boot.error && <p className="mb-4 rounded bg-red-100 p-3 text-red-800">{t('error')} ({boot.error})</p>}
+        <ErrorBoundary key={location.pathname}>
         {!personasLoaded && !boot.error ? <p>{t('loading')}</p> : (
           <Routes>
             <Route path="/" element={<Picker personas={personas} onPick={(p) => { setPersona(p.id); nav('/home'); }} />} />
@@ -82,6 +85,7 @@ export function App() {
             } />
           </Routes>
         )}
+        </ErrorBoundary>
       </main>
       <ScenarioPanel personas={personas} me={me} />
       <FeedbackBox signedIn={!!me} />

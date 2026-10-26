@@ -6,6 +6,9 @@ import { buildSeed, isoDate } from './seed';
 /** Item kinds that make up a demo session; `reset` wipes and reseeds all of them. */
 export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF', 'REQUEST', 'AREA'];
 
+/** Bumped whenever the starting data gains something older sessions lack; older sessions are upgraded in place on next use. */
+export const SEED_VERSION = 2;
+
 export async function resetSession(id: string, today = isoDate(new Date())): Promise<void> {
   await ensureTable();
   const s = session(id);
@@ -19,7 +22,7 @@ export async function resetSession(id: string, today = isoDate(new Date())): Pro
   await s.putMany('WINDOW', seed.windows.map((w) => ({ sk: `${w.listingId}#${w.start}`, data: w })));
   await s.putMany('DIST', Object.entries(seed.distances).map(([from, to]) => ({ sk: from, data: { from, to } })));
   await s.put('CONFIG', 'model', DEFAULT_CONFIG);
-  await s.put('META', 'session', { seededOn: today, version: 1 });
+  await s.put('META', 'session', { seededOn: today, version: SEED_VERSION });
 }
 
 export async function isSeeded(s: Session): Promise<boolean> {
@@ -32,7 +35,11 @@ export async function isSeeded(s: Session): Promise<boolean> {
  * while the others wait for it to finish.
  */
 export async function ensureSeeded(s: Session): Promise<void> {
-  if (await isSeeded(s)) return;
+  const meta = await s.get<{ seededOn?: string; version?: number }>('META', 'session');
+  if (meta) {
+    if ((meta.version ?? 1) < SEED_VERSION) await upgradeSession(s, meta.seededOn);
+    return;
+  }
   if (await s.putIfAbsent('LOCK', 'seed', { expires: Date.now() + 30_000 })) {
     try {
       if (!(await isSeeded(s))) await resetSession(s.id);
@@ -48,8 +55,26 @@ export async function ensureSeeded(s: Session): Promise<void> {
   throw new Error('Session seeding timed out');
 }
 
-export const getConfig = async (s: Session): Promise<ModelConfig> =>
-  (await s.get<ModelConfig>('CONFIG', 'model')) ?? DEFAULT_CONFIG;
+/** Stored settings laid over the current defaults, so a setting added later never reads as missing. */
+export const getConfig = async (s: Session): Promise<ModelConfig> => {
+  const stored = await s.get<Partial<ModelConfig>>('CONFIG', 'model');
+  return sanitiseConfig({ ...stored }, { ...DEFAULT_CONFIG, ...stored });
+};
+
+/**
+ * Bring an older session up to date without touching its orders, requests, stock or listings: refresh the reference
+ * data that comes from the data files (organisations, areas, categories, distances) and complete the model settings.
+ * Safe to run twice at once.
+ */
+export async function upgradeSession(s: Session, seededOn = isoDate(new Date())): Promise<void> {
+  const seed = buildSeed(seededOn);
+  await s.putMany('ORG', seed.orgs.map((o) => ({ sk: o.id, data: o })));
+  await s.putMany('AREA', seed.areas.map((a) => ({ sk: a.id, data: a })));
+  await s.putMany('CATEGORY', seed.categories.map((c) => ({ sk: c.id, data: c })));
+  await s.putMany('DIST', Object.entries(seed.distances).map(([from, to]) => ({ sk: from, data: { from, to } })));
+  await s.put('CONFIG', 'model', await getConfig(s));
+  await s.put('META', 'session', { seededOn, version: SEED_VERSION });
+}
 
 export async function updateConfig(s: Session, patch: Record<string, unknown>): Promise<ModelConfig> {
   const next = sanitiseConfig(patch, await getConfig(s));
