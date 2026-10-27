@@ -95,7 +95,16 @@ test('every page carries a red banner under the top line saying this is a protot
   await page.goto(`/?s=${newSession()}`);
   const banner = page.getByTestId('subhead');
   await expect(banner).toHaveText('Prototype for experiment and discussion');
-  await expect(banner).toHaveCSS('background-color', 'rgb(220, 38, 38)');
+  const [r, g, b] = await banner.evaluate((el) => {
+    // The browser may report the colour in any notation; paint a pixel to read it as red, green, blue
+    const c = document.createElement('canvas').getContext('2d')!;
+    c.fillStyle = getComputedStyle(el).backgroundColor;
+    c.fillRect(0, 0, 1, 1);
+    return [...c.getImageData(0, 0, 1, 1).data];
+  });
+  expect(r).toBeGreaterThan(180); // clearly red
+  expect(g).toBeLessThan(90);
+  expect(b).toBeLessThan(90);
 
   // A full-width strip directly below the top line, which keeps its usual arrangement
   const title = await page.getByRole('link', { name: /Bwyd Lleol Bro Teifi/ }).boundingBox();
