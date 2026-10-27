@@ -88,5 +88,5 @@ test('Welsh toggle switches the interface language', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'Browse' })).toBeVisible();
   await page.getByRole('button', { name: 'Cymraeg' }).click();
   await expect(page.getByRole('tab', { name: 'Pori' })).toBeVisible();
-  await expect(page.getByText('Dyddiad dosbarthu').first()).toBeVisible();
+  await expect(page.getByText('Ei angen ar').first()).toBeVisible();
 });

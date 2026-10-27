@@ -12,7 +12,7 @@ It is written for a Zoom session where a few people role-play, but works in a ro
 |---|---|
 | Role picker, shareable role links, English/Welsh | Working |
 | Producer: weekly stock & forecast editor, confidence levels, listings, prices, volume prices | Working |
-| Buyer: browse by delivery date, basket, placing orders, cancelling, menu planner | Working |
+| Buyer: whole catalogue with shelf life (set by the producer), day-you-need-it view with nearest alternative days, basket with a delivery day and a note for each item, placing orders, cancelling, menu planner | Working |
 | Producer: order inbox (confirm, decline with a reason, mark picked, record delivery incl. short deliveries) | Working |
 | Stock reducing when orders are placed or confirmed, live on every screen | Working |
 | Buyer warned and offered alternatives when a producer cuts supply they have already ordered | Working |
@@ -92,14 +92,20 @@ for you? How far ahead can you honestly forecast?*
 
 1. **Menu planner tab.** *"This is a chef planning a month ahead."* Each row is a product, each column a week; green is
    in stock, amber is forecast, grey is only planned. Star a few **usual items** and tick **Only my usual items**.
-2. **Click an amber (forecast) cell** a couple of weeks out. It jumps to Browse for a delivery date in that week.
+2. **Click an amber (forecast) cell** a couple of weeks out. It jumps to Browse for a day in that week.
    *"I can order something that isn't picked yet. The producer sees a commitment, I get certainty."*
-3. **Browse tab.** Point at the **delivery date**, the drive distance and **reliability score** next to each producer,
-   and the **availability** badge. Switch to an unavailable product and read why (*"Not delivered on this day"*,
-   *"Needs more notice"*). Cheese is delivered on Wednesdays only, so on a Thursday it shows as not deliverable.
-4. **Add items from two producers** (e.g. milk from Dyfed Dairy and lamb from Teifi Butchers) to the basket. Point at
-   the total and the line *"2 separate invoices, 2 separate deliveries"*.
-5. **Place the order.** The buyer gets an order reference for each producer, and each producer's **bell** lights up.
+3. **Browse tab.** *"This is the whole catalogue, whatever the date: I can see what I could get."* Point at the drive
+   distance and **reliability score** next to each producer, and the line **"Good for 2 days after delivery"**: each
+   producer sets how long their product keeps (milk 2 days, cheese 2 months, or whatever they say on **My listings**).
+   Now change **Needed on**. Items that can reach you in time get a green **✓ In stock** flag and *"Delivered Wed 4 Nov"*:
+   milk delivered the day before is fine for Thursday, but not delivered last week. Items that cannot are greyed with
+   **← Tue 3 Nov** and **Mon 16 Nov →** buttons: *"the nearest days it can be had"*. Click one to jump there.
+   Pick a Sunday, or a date months ahead, to see it clearly.
+4. **Add items from two producers** (e.g. milk from Dyfed Dairy and lamb from Teifi Butchers) to the basket. In the
+   basket **each item has its own delivery day** (a drop-down of the days it can arrive and still be good) and **its own
+   note for the producer**. Add milk again for the following week: it becomes a second line on another day. Point at
+   the total and the lines *"2 separate invoices, 3 separate deliveries"*.
+5. **Place the order.** The buyer gets an order reference for each producer **and day**, and each producer's **bell** lights up.
 6. **Switch to Dyfed Dairy's screen**: the **Orders** tab shows a new order needing an answer. Press **Confirm**.
    Now go to **Stock & forecast**: that week shows *"N reserved"* and *"Buyers can order"* has dropped.
    *"Advertised stock reduces automatically when the order is confirmed."*
@@ -107,8 +113,11 @@ for you? How far ahead can you honestly forecast?*
    try to order the last few units: their basket line turns red (*"Sold out"* / *"Only N available"*) without reloading.
 8. Show **Decline** (with a reason) and a buyer **Cancel**: the stock comes back.
 
-Ask the buyers: *Is a distance limit per product sensible? Is a delivery date per basket right, or would you want
-different days per item? What would you want to filter or sort by that isn't here?*
+Ask the buyers: *Is a distance limit per product sensible? Is "needed on" the right way to shop, with the delivery day
+worked out for you? Is a note per item enough? What would you want to filter or sort by that isn't here?*
+
+Ask the producers: *How long does each of your products really keep? Would you want to give different shelf lives for
+different batches?*
 
 ### 4. Delivery, and when things go wrong (8 min)
 
@@ -246,9 +255,9 @@ in one place. Ask people to use it during the session rather than afterwards.
 | A helper's screen doesn't update | It refreshes every few seconds. Wait, or reload the page; their role link still works |
 | Someone is in the wrong role | **Switch role** (top right), or send them the correct link |
 | Wrong language | **Cymraeg / English** button |
-| A product says "Not delivered on this day" | Each category has delivery days (cheese Wednesday; most others Tue/Thu/Fri/Sat). Change the delivery date |
-| A request is refused ("not delivered on that day", "notice") | The same delivery-day and notice rules apply; pick another date |
-| Everything is "not delivered" on most days | You are on *Area delivery days* or *Hub courier*: only the producer rounds or hub days work. Use the strip of days, or switch the Delivery model back |
+| A product is greyed out for the day I chose | It cannot reach you in time: no delivery day with stock within its shelf life before that day. Use the **← / →** buttons for the nearest days that work, or ask the producer to lengthen the shelf life |
+| A request is refused ("not delivered on that day", "notice") | A request is for a day the goods are needed, and the same delivery-day and notice rules apply; pick another date |
+| Most things are greyed out on most days | You are on *Area delivery days* or *Hub courier*: only the producer rounds or hub days work. Use the strip of days, or switch the Delivery model back |
 | The scenario bar is in the way | Press **Hide** (it becomes a small pill); **All steps** opens the list; **End scenario** (operator) removes it |
 | Bidding is missing | You are on *First to accept*: producers accept the buyer's price instead of bidding |
 | "Reset" did not clear a buyer's basket | The basket is kept in that browser; remove the lines or clear it |

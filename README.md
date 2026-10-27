@@ -12,8 +12,10 @@ businesses.
 
 - **Producers** publish what they have now and expect later (weekly stock with *in stock / forecast / provisional*
   confidence), manage listings and prices, answer orders, record picking and delivery, and bid on buyers' requests.
-- **Buyers** browse by delivery date, plan menus weeks ahead, order from several producers at once, watch stock fall
-  as others order, and ask for things nobody has listed yet.
+- **Buyers** browse the whole catalogue and choose the day they need things: what can be delivered in time, within each
+  product's shelf life (set by the producer), is flagged, and the rest shows the nearest days that work. They plan menus
+  weeks ahead, build a basket where every item has its own delivery day and its own note for the producer, watch stock
+  fall as others order, and ask for things nobody has listed yet.
 - **The operator** switches the operating model live (market structure, food hub or platform, delivery, when stock is
   reserved, how forecasts can be ordered, speculative-order style, pricing, "local" range, trust display), runs guided
   scenarios, sees every order, request and delivery run, and reads the feedback people leave.

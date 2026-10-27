@@ -44,6 +44,7 @@ export function RunSheet({ orders, boot, producerId }: { orders: Order[]; boot: 
                       return (
                         <li key={i}>{l.qty} {p && t(`units.${p.unit}`)} {p && loc(p.name)}
                           {!producerId && <span className="text-slate-500"> {t('fromProducer', { name: orgs.get(l.producerId)?.name })}</span>}
+                          {l.note && <span className="italic text-slate-600" data-testid="run-note"> — “{l.note}”</span>}
                         </li>
                       );
                     })}

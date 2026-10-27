@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { offersFor } from '../../shared/browse';
 import { addDays, todayIso } from '../../shared/dates';
-import { availabilityFor, nextWeekday, windowKey } from '../../shared/orders';
+import { availableForUse, deliverableDates, shelfLifeFor } from '../../shared/availability';
+import { nextWeekday } from '../../shared/orders';
 import type { RequestView, SupplyWindow } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
 import { loc } from '../i18n';
@@ -37,8 +38,13 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
   const already = useMemo(() => {
     if (!product) return 0;
     const byWindow = new Map(windows.map((w) => [`${w.listingId}#${w.start}`, w]));
-    return offersFor(buyerId, boot).filter((o) => o.product.id === product.id && o.status !== 'hidden'
-      && availabilityFor({ config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(o.listing.id, date)), date, today: todayIso(), driveKm: o.driveKm, rule: o.rule }).orderable >= Math.max(1, Number(qty) || 1)).length;
+    const wanted = Math.max(1, Number(qty) || 1);
+    return offersFor(buyerId, boot).filter((o) => {
+      if (o.product.id !== product.id || o.status === 'hidden') return false;
+      const days = deliverableDates({ config: boot.config, category: o.category, listing: o.listing, rule: o.rule, driveKm: o.driveKm, windows: byWindow, today: todayIso() });
+      const use = availableForUse(days, shelfLifeFor(o.category, o.listing), date);
+      return use.ok && use.best.orderable >= wanted;
+    }).length;
   }, [product, buyerId, boot, windows, date, qty]);
 
   const submit = async (e: React.FormEvent) => {

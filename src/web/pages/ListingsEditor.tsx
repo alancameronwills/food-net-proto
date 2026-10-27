@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { capabilities } from '../../shared/models';
 import type { Listing, Product } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
+import { shelfLifeFor } from '../../shared/availability';
+import { duration } from '../format';
 import { loc } from '../i18n';
 
 type Tier = { minQty: string; price: string };
@@ -32,7 +34,7 @@ export function ListingsEditor({ producerId, boot, reload }: { producerId: strin
       {mine.map((l) => {
         const p = products.get(l.productId)!;
         return editing === l.id ? (
-          <ListingForm key={l.id} product={p} listing={l} tiersOn={tiersOn} onCancel={() => setEditing(undefined)}
+          <ListingForm key={l.id} product={p} listing={l} tiersOn={tiersOn} defaultShelf={boot.categories.find((c) => c.id === p.category)?.shelfLifeDays} onCancel={() => setEditing(undefined)}
             onSubmit={async (b) => { if (await run(() => api(`/listings/${encodeURIComponent(l.id)}`, { method: 'PUT', body: JSON.stringify(b) }))) setEditing(undefined); }} />
         ) : (
           <div key={l.id} data-testid={`listing-${l.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
@@ -42,6 +44,7 @@ export function ListingsEditor({ producerId, boot, reload }: { producerId: strin
             </div>
             <div>£{l.pricePerUnit.toFixed(2)} {t('perUnit', { unit: t(`units.${p.unit}`) })}</div>
             <div className="text-sm text-slate-600">{t('minOrderLabel')}: {l.minOrder}</div>
+            <div className="text-sm text-slate-600" data-testid="shelf">{t('shelfLifeShort', { time: duration(t, shelfLifeFor(boot.categories.find((c) => c.id === p.category)!, l)) })}{l.shelfLifeDays === undefined && ` (${t('shelfUsual')})`}</div>
             {l.tiers?.length ? <div className="text-sm text-slate-600">{l.tiers.map((x) => `${x.minQty}+ £${x.price.toFixed(2)}`).join(' · ')}</div> : null}
             <button className="rounded border border-brand px-3 py-1 text-sm font-medium text-brand hover:bg-brand-light" onClick={() => setEditing(l.id)}>{t('edit')}</button>
             <button className="rounded border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50"
@@ -51,7 +54,7 @@ export function ListingsEditor({ producerId, boot, reload }: { producerId: strin
       })}
 
       {adding ? (
-        <ListingForm products={available} tiersOn={tiersOn} onCancel={() => setAdding(false)}
+        <ListingForm products={available} tiersOn={tiersOn} categories={boot.categories} onCancel={() => setAdding(false)}
           onSubmit={async (b) => { if (await run(() => api('/listings', { method: 'POST', body: JSON.stringify(b) }))) setAdding(false); }} />
       ) : (
         <button disabled={available.length === 0} className="rounded bg-gold px-4 py-2 font-semibold text-brand-dark disabled:opacity-50" onClick={() => setAdding(true)}>
@@ -62,8 +65,8 @@ export function ListingsEditor({ producerId, boot, reload }: { producerId: strin
   );
 }
 
-function ListingForm({ product, products, listing, tiersOn, onSubmit, onCancel }: {
-  product?: Product; products?: Product[]; listing?: Listing; tiersOn: boolean;
+function ListingForm({ product, products, listing, tiersOn, defaultShelf, categories, onSubmit, onCancel }: {
+  product?: Product; products?: Product[]; listing?: Listing; tiersOn: boolean; defaultShelf?: number; categories?: { id: string; shelfLifeDays: number }[];
   onSubmit: (body: Record<string, unknown>) => void; onCancel: () => void;
 }) {
   const { t } = useTranslation();
@@ -71,12 +74,15 @@ function ListingForm({ product, products, listing, tiersOn, onSubmit, onCancel }
   const [price, setPrice] = useState(listing ? String(listing.pricePerUnit) : '');
   const [minOrder, setMinOrder] = useState(listing ? String(listing.minOrder) : '1');
   const [tiers, setTiers] = useState<Tier[]>(toTiers(listing));
+  const [shelf, setShelf] = useState(listing?.shelfLifeDays !== undefined ? String(listing.shelfLifeDays) : '');
   const chosen = product ?? products?.find((p) => p.id === productId);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const body: Record<string, unknown> = { pricePerUnit: Number(price), minOrder: Number(minOrder) };
     if (!listing) body.productId = productId;
+    // Blank means "use the usual for this kind of product"
+    if (shelf.trim() !== '') body.shelfLifeDays = Number(shelf); else if (listing) body.shelfLifeDays = null;
     if (tiersOn || listing?.tiers) body.tiers = tiers.filter((x) => x.minQty && x.price).map((x) => ({ minQty: Number(x.minQty), price: Number(x.price) }));
     onSubmit(body);
   };
@@ -98,6 +104,12 @@ function ListingForm({ product, products, listing, tiersOn, onSubmit, onCancel }
           <input required type="number" min={0.01} step="any" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} className={`${input} ml-2 w-24`} />
         </label>
       </div>
+
+      <label className="block text-sm">{t('shelfLifeLabel')}
+        <input type="number" min={1} max={730} step={1} value={shelf} onChange={(e) => setShelf(e.target.value)} aria-label={t('shelfLifeLabel')}
+          placeholder={String(defaultShelf ?? categories?.find((c) => c.id === chosen?.category)?.shelfLifeDays ?? '')} className={`${input} ml-2 w-24`} />
+        <span className="ml-2 text-xs text-slate-500">{t('shelfLifeHelp')}{shelf && Number(shelf) >= 1 && ` = ${duration(t, Number(shelf))}`}</span>
+      </label>
 
       {(tiersOn || tiers.length > 0) && (
         <fieldset className="text-sm">

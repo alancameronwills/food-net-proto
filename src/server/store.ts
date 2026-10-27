@@ -7,7 +7,7 @@ import { buildSeed, isoDate } from './seed';
 export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF', 'REQUEST', 'AREA'];
 
 /** Bumped whenever the starting data gains something older sessions lack; older sessions are upgraded in place on next use. */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 export async function resetSession(id: string, today = isoDate(new Date())): Promise<void> {
   await ensureTable();

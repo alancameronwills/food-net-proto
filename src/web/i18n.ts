@@ -113,6 +113,12 @@ const en = {
   feedbackWho: 'Who', feedbackScreen: 'Screen', feedbackModel: 'Model', feedbackComment: 'Comment', feedbackWhen: 'When', feedbackScenarioCol: 'Scenario', thumbsUp: 'Good', thumbsDown: 'Not good',
   presetsTitle: 'Start from a preset', presetsHint: 'Sets several switches at once; adjust any of them afterwards.', applyPreset: 'Apply',
   crashTitle: 'This screen hit a problem', crashHint: 'Reloading usually fixes it. If it keeps happening, tell the person running the demo.', crashReload: 'Reload',
+  neededOn: 'Needed on', shelfLifeLine: 'Good for {{time}} after delivery', deliveredOn: 'Delivered {{date}}', notAvailableFor: 'Not available for {{date}}',
+  nearestDays: 'Nearest days it can be had:', noSupplySoon: 'No supply planned in the coming months.',
+  dur_day_one: '{{count}} day', dur_day_other: '{{count}} days', dur_week_one: '{{count}} week', dur_week_other: '{{count}} weeks', dur_month_one: '{{count}} month', dur_month_other: '{{count}} months',
+  deliverOn: 'Deliver on', forUseOn: 'for use on {{date}}, good for {{time}}', lineNote: 'Note for the producer about', lineNotePlaceholder: 'Note for the producer about this item (optional)',
+  deliveriesHubMany: '{{n}} consolidated deliveries, one per day',
+  shelfUsual: 'usual for this product', shelfLifeLabel: 'Shelf life (days)', shelfLifeHelp: 'How long it stays good after delivery. Leave blank for the usual for this kind of product.', shelfLifeShort: 'Good for {{time}}',
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
 };
 const cy: typeof en = {
@@ -225,6 +231,12 @@ const cy: typeof en = {
   feedbackWho: 'Pwy', feedbackScreen: 'Sgrin', feedbackModel: 'Model', feedbackComment: 'Sylw', feedbackWhen: 'Pryd', feedbackScenarioCol: 'Senario', thumbsUp: 'Da', thumbsDown: 'Ddim yn dda',
   presetsTitle: 'Dechrau o osodiad parod', presetsHint: 'Yn gosod sawl switsh ar unwaith; addaswch unrhyw un ohonynt wedyn.', applyPreset: 'Gosod',
   crashTitle: 'Cafodd y sgrin hon broblem', crashHint: 'Fel arfer mae ail-lwytho yn ei drwsio. Os bydd yn parhau, dywedwch wrth y person sy’n rhedeg yr arddangosiad.', crashReload: 'Ail-lwytho',
+  neededOn: 'Ei angen ar', shelfLifeLine: 'Da am {{time}} ar ôl ei ddosbarthu', deliveredOn: 'Dosbarthu {{date}}', notAvailableFor: 'Ddim ar gael ar gyfer {{date}}',
+  nearestDays: 'Y diwrnodau agosaf y gellir ei gael:', noSupplySoon: 'Dim cyflenwad wedi’i gynllunio yn y misoedd nesaf.',
+  dur_day_one: '{{count}} diwrnod', dur_day_other: '{{count}} diwrnod', dur_week_one: '{{count}} wythnos', dur_week_other: '{{count}} wythnos', dur_month_one: '{{count}} mis', dur_month_other: '{{count}} mis',
+  deliverOn: 'Dosbarthu ar', forUseOn: 'i’w ddefnyddio ar {{date}}, da am {{time}}', lineNote: 'Nodyn i’r cynhyrchydd am', lineNotePlaceholder: 'Nodyn i’r cynhyrchydd am yr eitem hon (dewisol)',
+  deliveriesHubMany: '{{n}} danfoniad cyfunol, un y diwrnod',
+  shelfUsual: 'arferol ar gyfer y cynnyrch hwn', shelfLifeLabel: 'Oes silff (diwrnodau)', shelfLifeHelp: 'Pa mor hir y mae’n aros yn dda ar ôl ei ddosbarthu. Gadewch yn wag am y arferol ar gyfer y math hwn o gynnyrch.', shelfLifeShort: 'Da am {{time}}',
   units: { litre: 'litr', kg: 'kg', dozen: 'dwsin', loaf: 'torth', each: 'yr un', crate: 'cawell' },
 };
 

@@ -47,6 +47,14 @@ function cleanTiers(tiers: unknown, minOrder: number, price: number): Result<{ t
   return { ok: true, tiers: out.length ? out : undefined };
 }
 
+/** The producer's shelf life for a listing: undefined = not given, null = use the category's, else whole days. */
+function cleanShelfLife(v: unknown): Result<{ shelfLifeDays: number | null | undefined }> {
+  if (v === undefined) return { ok: true, shelfLifeDays: undefined };
+  if (v === null) return { ok: true, shelfLifeDays: null };
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > 730) return fail(400, 'shelfLifeDays must be a whole number of days from 1 to 730');
+  return { ok: true, shelfLifeDays: v };
+}
+
 export async function addListing(s: Session, actor: Organisation | undefined, body: Record<string, any>): Promise<Result<{ listing: Listing }>> {
   if (!actor || (actor.role !== 'producer' && actor.role !== 'operator')) return fail(403, 'Only producers can add listings');
   const producerId = actor.role === 'operator' ? body.producerId : actor.id;
@@ -58,9 +66,12 @@ export async function addListing(s: Session, actor: Organisation | undefined, bo
   if (!isMoney(body.minOrder)) return fail(400, 'minOrder must be a positive number');
   const tiers = cleanTiers(body.tiers, body.minOrder, body.pricePerUnit);
   if (!tiers.ok) return tiers;
+  const shelf = cleanShelfLife(body.shelfLifeDays);
+  if (!shelf.ok) return shelf;
   const listing: Listing = {
     id: `${producer.id}:${product.id}`, producerId: producer.id, productId: product.id,
     pricePerUnit: body.pricePerUnit, minOrder: body.minOrder, certifications: [], tiers: tiers.tiers,
+    ...(typeof shelf.shelfLifeDays === 'number' ? { shelfLifeDays: shelf.shelfLifeDays } : {}),
   };
   if (!(await s.create('LISTING', listing.id, listing))) return fail(409, 'You already list this product');
   return { ok: true, listing };
@@ -75,7 +86,11 @@ export async function updateListing(s: Session, actor: Organisation | undefined,
   if (!isMoney(minOrder)) return fail(400, 'minOrder must be a positive number');
   const tiers = cleanTiers('tiers' in body ? body.tiers : got.listing.tiers, minOrder, price);
   if (!tiers.ok) return tiers;
-  const listing: Listing = { ...got.listing, pricePerUnit: price, minOrder, tiers: tiers.tiers };
+  const shelf = cleanShelfLife(body.shelfLifeDays);
+  if (!shelf.ok) return shelf;
+  const { shelfLifeDays: _old, ...rest } = got.listing;
+  const keep = shelf.shelfLifeDays === undefined ? got.listing.shelfLifeDays : shelf.shelfLifeDays ?? undefined;
+  const listing: Listing = { ...rest, pricePerUnit: price, minOrder, tiers: tiers.tiers, ...(keep !== undefined ? { shelfLifeDays: keep } : {}) };
   await s.put('LISTING', id, listing);
   return { ok: true, listing };
 }

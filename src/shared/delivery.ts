@@ -54,7 +54,7 @@ export function nearestArea(areas: Area[], lat: number, lon: number): string | u
 export type RunStop = {
   buyerId: string; area?: string; orderIds: string[];
   /** What goes to this buyer, with which producer it comes from (several producers means several vans unless the hub consolidates). */
-  lines: { producerId: string; productId: string; qty: number }[];
+  lines: { producerId: string; productId: string; qty: number; note?: string }[];
 };
 export type Run = { date: string; stops: RunStop[]; /** Deliveries if every producer drives separately, vs one drop per buyer. */ separateDrops: number; consolidatedDrops: number };
 
@@ -72,7 +72,7 @@ export function buildRuns(orders: Order[], orgs: Organisation[], opts: { include
       const mine = todays.filter((o) => o.buyerId === buyerId);
       return {
         buyerId, area: byOrg.get(buyerId)?.area, orderIds: mine.map((o) => o.id),
-        lines: mine.flatMap((o) => o.lines.map((l) => ({ producerId: o.producerId, productId: l.productId, qty: l.qty }))),
+        lines: mine.flatMap((o) => o.lines.map((l) => ({ producerId: o.producerId, productId: l.productId, qty: l.qty, ...(l.note ? { note: l.note } : {}) }))),
       };
     }).sort((a, b) => (a.area ?? '').localeCompare(b.area ?? '') || a.buyerId.localeCompare(b.buyerId));
     return {

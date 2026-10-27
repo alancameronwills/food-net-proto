@@ -111,31 +111,38 @@ function shortfall(ctx: Ctx, order: Pick<Order, 'lines' | 'deliveryDate'>, windo
 // ---- placing -------------------------------------------------------------------------------
 
 type PlaceBody = { deliveryDate?: unknown; lines?: unknown; note?: unknown };
-export type Placed = { orders: Order[]; failed: { producerId: string; error: string }[] };
+export type Placed = { orders: Order[]; failed: { producerId: string; deliveryDate: string; error: string }[] };
 
 /**
- * Place a checkout: validate every line against live stock and the delivery rules, split it into
- * one order per producer, and (depending on the stock model) hold or reserve stock atomically.
+ * Place a checkout. Every line carries its own delivery day and its own note for the producer. Each line is
+ * checked against live stock and the delivery rules; the checkout is then split into one order per producer
+ * and delivery day, and (depending on the stock model) stock is held or reserved atomically for each.
+ * (A top-level `deliveryDate` is accepted as the day for any line that does not give its own.)
  */
 export async function placeOrders(s: Session, actor: Organisation | undefined, body: PlaceBody): Promise<Result<Placed>> {
   if (actor?.role !== 'buyer') return fail(403, 'Only buyers can place orders');
-  if (!isIsoDate(body.deliveryDate)) return fail(400, 'deliveryDate required (YYYY-MM-DD)');
-  const deliveryDate = body.deliveryDate;
   if (!Array.isArray(body.lines) || body.lines.length === 0) return fail(400, 'Your basket is empty');
-  if (body.lines.length > MAX_LINES) return fail(400, `At most ${MAX_LINES} products per order`);
-  const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 300) : undefined;
+  if (body.lines.length > MAX_LINES) return fail(400, `At most ${MAX_LINES} items per checkout`);
+  const orderNote = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 300) : undefined;
 
   const ctx = await load(s);
   const today = todayIso();
-  const merged = new Map<string, number>();
-  for (const raw of body.lines as { listingId?: unknown; qty?: unknown }[]) {
+  type Want = { listingId: string; deliveryDate: string; qty: number; note?: string };
+  const merged = new Map<string, Want>();
+  for (const raw of body.lines as { listingId?: unknown; qty?: unknown; deliveryDate?: unknown; note?: unknown }[]) {
     if (typeof raw?.listingId !== 'string' || !Number.isInteger(raw.qty) || (raw.qty as number) <= 0) return fail(400, 'Each line needs a listingId and a whole quantity');
-    merged.set(raw.listingId, (merged.get(raw.listingId) ?? 0) + (raw.qty as number));
+    const deliveryDate = raw.deliveryDate ?? body.deliveryDate;
+    if (!isIsoDate(deliveryDate)) return fail(400, 'Each item needs a delivery date (YYYY-MM-DD)');
+    const note = typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim().slice(0, 300) : undefined;
+    const key = `${raw.listingId}@${deliveryDate}`;
+    const have = merged.get(key);
+    merged.set(key, { listingId: raw.listingId, deliveryDate, qty: (have?.qty ?? 0) + (raw.qty as number), note: have?.note ?? note });
   }
 
-  const byProducer = new Map<string, OrderLine[]>();
+  const byOrder = new Map<string, { producerId: string; deliveryDate: string; lines: OrderLine[] }>();
   const windows = new Map<string, SupplyWindow>();
-  for (const [listingId, qty] of merged) {
+  for (const want of merged.values()) {
+    const { listingId, deliveryDate, qty } = want;
     const listing = ctx.listings.get(listingId);
     const product = listing && ctx.products.get(listing.productId);
     const category = product && ctx.categories.get(product.category);
@@ -148,18 +155,19 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
       driveKm: ctx.distances[actor.id]?.[listing.producerId] ?? Infinity,
       rule: deliveryRule(ctx.config, category, listing, ctx.orgs.get(listing.producerId), ctx.orgs.get(actor.id)?.area),
     });
-    if (av.problem) return fail(409, `${product.name.en} ${REASON[av.problem]}`);
-    if (qty > av.orderable) return fail(409, `${product.name.en}: only ${av.orderable} available`);
+    if (av.problem) return fail(409, `${product.name.en} ${REASON[av.problem]} (${deliveryDate})`);
+    if (qty > av.orderable) return fail(409, `${product.name.en}: only ${av.orderable} available on ${deliveryDate}`);
     const unitPrice = unitPriceFor(ctx.config, listing, qty);
-    const lines = byProducer.get(listing.producerId) ?? [];
-    lines.push({ listingId, productId: product.id, qty, unitPrice });
-    byProducer.set(listing.producerId, lines);
+    const key = `${listing.producerId}|${deliveryDate}`;
+    const entry = byOrder.get(key) ?? { producerId: listing.producerId, deliveryDate, lines: [] };
+    entry.lines.push({ listingId, productId: product.id, qty, unitPrice, ...(want.note ? { note: want.note } : {}) });
+    byOrder.set(key, entry);
   }
 
   const caps = capabilities(ctx.config);
   const groupId = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const result: Placed = { orders: [], failed: [] };
-  for (const [producerId, lines] of byProducer) {
+  for (const { producerId, deliveryDate, lines } of byOrder.values()) {
     const seq = await s.nextSeq('META', 'order-seq');
     const autoConfirm = !caps.producerConfirmsOrders; // "on placement": accepted automatically
     const stock: StockState = autoConfirm ? 'reserved' : caps.softHoldOnPlace ? 'held' : 'none';
@@ -168,10 +176,10 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
     const order: Order = {
       id: `BL-${1000 + seq}`, groupId, buyerId: actor.id, producerId, deliveryDate, status, stock, lines, deliveryMode: ctx.config.delivery as Order['deliveryMode'],
       total: Math.round(lines.reduce((n, l) => n + lineTotal(l.unitPrice, l.qty), 0) * 100) / 100,
-      note, createdAt: at, history: [{ at, status, by: actor.id }],
+      ...(orderNote ? { note: orderNote } : {}), createdAt: at, history: [{ at, status, by: actor.id }],
     };
     const err = await writeNewOrder(s, ctx, order, windows);
-    if (err) { result.failed.push({ producerId, error: err }); continue; }
+    if (err) { result.failed.push({ producerId, deliveryDate, error: err }); continue; }
     result.orders.push(order);
     await announce(s, 'order_placed', order, {}, ['producer']);
     if (order.status === 'confirmed') await announce(s, 'order_confirmed', order, {}, ['buyer']);

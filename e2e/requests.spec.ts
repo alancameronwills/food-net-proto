@@ -175,7 +175,7 @@ test.describe('speculative orders: open RFQ', () => {
       await buyer.page.getByRole('button', { name: 'See them in Browse' }).click();
       await expect(buyer.page.getByRole('tab', { name: 'Browse' })).toHaveAttribute('aria-selected', 'true');
       await expect(buyer.page.getByLabel('Search products')).toHaveValue('Whole milk');
-      await expect(buyer.page.getByLabel('Delivery date').first()).toHaveValue(SOON);
+      await expect(buyer.page.getByLabel('Needed on')).toHaveValue(SOON);
     } finally {
       await buyer.close();
     }

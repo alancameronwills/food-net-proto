@@ -5,6 +5,9 @@ import { nextWeekday } from '../src/shared/orders';
 let n = 0;
 const newSession = () => `pw-${Date.now().toString(36)}-b${n++}-${Math.random().toString(36).slice(2, 6)}`;
 const MILK = 'dyfed-dairy:milk-whole';
+const SOON_THURSDAY = nextWeekday(addDays(todayIso(), 3), [4]);
+// "Thu 5 Nov", as the screens write it (Node puts a comma after the weekday)
+const shortDay = (iso: string) => new Date(iso + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '');
 const DELIVERY = nextWeekday(addDays(todayIso(), 3), [4]); // the buyer's default delivery day: next Thursday at least 3 days away
 const WEEK = mondayOf(DELIVERY);
 
@@ -33,29 +36,79 @@ async function addMilk(page: import('@playwright/test').Page, qty: number) {
 }
 
 test.describe('buyer: browsing and the basket', () => {
-  test('shows what can be ordered for the chosen date, with price and availability', async ({ page, request }) => {
+  test('shows the whole catalogue, with a stock flag, delivery day and shelf life for the day you need it', async ({ page, request }) => {
     const s = newSession();
     await setModel(request, s);
     await page.goto(buyerUrl(s));
+    await expect(page.getByLabel('Needed on')).toHaveValue(SOON_THURSDAY);
     await expect(page.getByTestId('delivery-long')).toContainText('Thursday');
     const offer = page.getByTestId(`offer-${MILK}`);
     await expect(offer).toContainText('Whole milk');
     await expect(offer).toContainText('Dyfed Dairy');
     await expect(offer).toContainText('£0.95 per litre');
-    await expect(offer).toContainText(/In stock · \d+ available|Forecast · \d+ available/);
+    await expect(offer.getByTestId('stock-flag')).toContainText(/✓ (In stock|Forecast)/);
+    await expect(offer.getByTestId('delivered-on')).toContainText('Delivered Thu'); // milk is delivered that very day
+    await expect(offer.getByTestId('shelf-life')).toHaveText('Good for 2 days after delivery');
+    await expect(page.getByTestId('offer-dyfed-dairy:cheese-cheddar').getByTestId('shelf-life')).toHaveText('Good for 2 months after delivery');
   });
 
-  test('explains why something cannot be ordered on a given date', async ({ page, request }) => {
+  test('the whole catalogue stays visible whatever the date, and the filter is optional', async ({ page, request }) => {
     const s = newSession();
     await setModel(request, s);
     await page.goto(buyerUrl(s));
+    const cards = page.locator('[data-testid^="offer-"]');
+    await expect(cards.first()).toBeVisible();
+    const everything = await cards.count();
+    expect(everything).toBeGreaterThan(20);
+    await page.getByLabel('Needed on').fill(addDays(todayIso(), 120)); // far beyond any planned supply
+    await expect(cards).toHaveCount(everything); // nothing disappears
+    await expect(page.locator('[data-testid^="offer-"][data-available="true"]')).toHaveCount(0);
+    await page.getByLabel('Only what I can order').check();
+    await expect(page.getByText('Nothing matches')).toBeVisible();
     await page.getByLabel('Only what I can order').uncheck();
-    const cheese = page.getByTestId('offer-dyfed-dairy:cheese-cheddar'); // cheese is delivered on Wednesdays only
-    await expect(cheese.getByTestId('why-not')).toHaveText('Not delivered on this day');
-    await page.getByLabel('Delivery date').first().fill(nextWeekday(addDays(todayIso(), 3), [3]));
-    await expect(cheese.getByRole('button', { name: 'Add' })).toBeVisible();
-    await page.getByLabel('Delivery date').first().fill(addDays(todayIso(), 1)); // too soon for the 3-day cheese notice
-    await expect(cheese.getByTestId('why-not')).toHaveText('Needs more notice for this date');
+    await expect(cards).toHaveCount(everything);
+  });
+
+  test('items that cannot be had that day show the nearest days that work, and jump to them', async ({ page, request }) => {
+    const s = newSession();
+    await setModel(request, s);
+    await page.goto(buyerUrl(s));
+    const far = addDays(todayIso(), 80); // well past the last planned week
+    await page.getByLabel('Needed on').fill(far);
+    const milk = page.getByTestId(`offer-${MILK}`);
+    await expect(milk).toHaveAttribute('data-available', 'false');
+    await expect(milk.getByTestId('why-not')).toContainText('Not available for');
+    await expect(milk.getByTestId('nearest-later')).toHaveCount(0); // nothing is planned after the last week
+    await milk.getByTestId('nearest-earlier').click(); // the last day milk delivered then would still be good
+    await expect(milk).toHaveAttribute('data-available', 'true');
+    await expect(milk.getByTestId('stock-flag')).toBeVisible();
+    const chosen = await page.getByLabel('Needed on').inputValue();
+    expect(chosen < far).toBe(true);
+  });
+
+  test('a longer shelf life, set by the producer, makes more days work', async ({ browser, request }) => {
+    const s = newSession();
+    // Only Tuesdays: milk (good for 2 days) is fine for Tue-Thu, but not for a Friday
+    await setModel(request, s, { delivery: 'hub_courier', hubDays: [2] });
+    const tuesday = nextWeekday(addDays(todayIso(), 4), [2]);
+    const friday = addDays(tuesday, 3);
+    const buyer = await person(browser, buyerUrl(s));
+    try {
+      await buyer.page.getByLabel('Needed on').fill(friday);
+      const milk = buyer.page.getByTestId(`offer-${MILK}`);
+      await expect(milk).toHaveAttribute('data-available', 'false');
+      await expect(milk.getByTestId('nearest-earlier')).toContainText(shortDay(addDays(tuesday, 2))); // Tuesday's delivery lasts to Thursday
+      await expect(milk.getByTestId('nearest-later')).toContainText(shortDay(addDays(tuesday, 7)));
+
+      // The dairy says its milk keeps for five days
+      const r = await request.put(`/api/listings/${encodeURIComponent(MILK)}`, { headers: { 'x-session': s, 'x-persona': 'dyfed-dairy' }, data: { shelfLifeDays: 5 } });
+      expect(r.ok()).toBe(true);
+      await expect(milk).toHaveAttribute('data-available', 'true', { timeout: 10_000 });
+      await expect(milk.getByTestId('shelf-life')).toHaveText('Good for 5 days after delivery');
+      await expect(milk.getByTestId('delivered-on')).toContainText(shortDay(tuesday));
+    } finally {
+      await buyer.close();
+    }
   });
 
   test('the basket totals up, applies minimum orders, and survives a reload', async ({ page, request }) => {
@@ -258,8 +311,9 @@ test.describe('buyer: menu planner', () => {
     await planner.getByTestId(`cell-milk-whole-${addDays(mondayOf(todayIso()), 14)}`).click();
     await expect(page.getByRole('tab', { name: 'Browse' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByLabel('Search products')).toHaveValue('Whole milk');
-    const chosen = await page.getByLabel('Delivery date').first().inputValue();
+    const chosen = await page.getByLabel('Needed on').inputValue();
     expect(mondayOf(chosen)).toBe(addDays(mondayOf(todayIso()), 14));
+    await expect(page.getByTestId(`offer-${MILK}`).getByTestId('stock-flag')).toContainText('Forecast');
     await expect(page.getByTestId(`offer-${MILK}`)).toContainText('Forecast');
   });
 
@@ -289,11 +343,14 @@ test.describe('buyer: rules follow the model', () => {
     const buyer = await person(browser, buyerUrl(s));
     try {
       const forecastDay = nextWeekday(addDays(mondayOf(todayIso()), 14), [4]); // a week seeded as forecast
-      await buyer.page.getByLabel('Only what I can order').uncheck();
-      await buyer.page.getByLabel('Delivery date').first().fill(forecastDay);
-      await expect(buyer.page.getByTestId(`offer-${MILK}`).getByTestId('why-not')).toHaveText('Forecast only: not orderable under current rules');
+      await buyer.page.getByLabel('Needed on').fill(forecastDay);
+      const milk = buyer.page.getByTestId(`offer-${MILK}`);
+      // Milk keeps only two days, so with forecast stock off the table nothing delivers in that week
+      await expect(milk).toHaveAttribute('data-available', 'false');
+      await expect(milk.getByTestId('why-not')).toContainText('Not available for');
       await request.put('/api/config', { headers: { 'x-session': s, 'x-persona': 'operator' }, data: { forecastOrdering: 'full_forecast' } });
-      await expect(buyer.page.getByTestId(`offer-${MILK}`).getByRole('button', { name: 'Add' })).toBeVisible({ timeout: 10_000 });
+      await expect(milk.getByRole('button', { name: 'Add' })).toBeVisible({ timeout: 10_000 });
+      await expect(milk.getByTestId('stock-flag')).toContainText('Forecast');
     } finally {
       await buyer.close();
     }

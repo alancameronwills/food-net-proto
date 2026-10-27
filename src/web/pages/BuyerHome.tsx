@@ -18,7 +18,9 @@ export function BuyerHome({ me, boot }: { me: Persona; boot: Bootstrap }) {
   const [tab, setTab] = useState<Tab>('browse');
   const [search, setSearch] = useState('');
   useScreen(`buyer/${tab}`);
-  const { cart, setDate, setQty, keepOnly } = useCart(me.id);
+  const { cart, setUseOn, add, setQty, setNote, setDeliveryDate, keepOnly } = useCart(me.id);
+  const qtyByListing: Record<string, number> = {};
+  for (const l of cart.lines) qtyByListing[l.listingId] = (qtyByListing[l.listingId] ?? 0) + l.qty;
   const { data: windows = [], reload: reloadWindows } = useWindows();
   const { data: orders = [], reload: reloadOrders } = useOrders();
   const { data: requests = [], reload: reloadRequests } = useRequests();
@@ -41,22 +43,22 @@ export function BuyerHome({ me, boot }: { me: Persona; boot: Bootstrap }) {
 
       {tab === 'browse' && (
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <Browse buyerId={me.id} boot={boot} windows={windows} date={cart.date} onDate={setDate} qtyInCart={cart.qty}
-            onAdd={(id, n) => setQty(id, (cart.qty[id] ?? 0) + n)} search={search} onSearch={setSearch} />
-          <CartPanel buyerId={me.id} boot={boot} windows={windows} date={cart.date} qty={cart.qty} setQty={setQty} keepOnly={keepOnly}
+          <Browse buyerId={me.id} boot={boot} windows={windows} useOn={cart.useOn} onUseOn={setUseOn} qtyInCart={qtyByListing}
+            onAdd={(listingId, qty, deliveryDate, useOn) => add({ listingId, qty, deliveryDate, useOn })} search={search} onSearch={setSearch} />
+          <CartPanel buyerId={me.id} boot={boot} windows={windows} lines={cart.lines} setQty={setQty} setNote={setNote} setDeliveryDate={setDeliveryDate} keepOnly={keepOnly}
             onPlaced={() => { reloadWindows(); reloadOrders(); }} />
         </div>
       )}
       {tab === 'planner' && (
-        <Planner buyerId={me.id} boot={boot} windows={windows} onPick={(date, name) => { setDate(date); setSearch(name); setTab('browse'); }} />
+        <Planner buyerId={me.id} boot={boot} windows={windows} onPick={(date, name) => { setUseOn(date); setSearch(name); setTab('browse'); }} />
       )}
       {tab === 'requests' && (capabilities(boot.config).showDemandBoard ? (
         <RequestsBuyer buyerId={me.id} boot={boot} windows={windows} requests={requests} reload={() => { reloadRequests(); reloadOrders(); reloadWindows(); }}
-          onBrowse={(date, name) => { setDate(date); setSearch(name); setTab('browse'); }} />
+          onBrowse={(date, name) => { setUseOn(date); setSearch(name); setTab('browse'); }} />
       ) : <p className="text-slate-600">{t('commitmentsSoon')}</p>)}
       {tab === 'orders' && (
         <MyOrders buyerId={me.id} orders={orders} boot={boot} windows={windows} reload={() => { reloadOrders(); reloadWindows(); }}
-          onAlternative={(id, n, date) => { setDate(date); setQty(id, (cart.qty[id] ?? 0) + n); setTab('browse'); }} />
+          onAlternative={(id, n, date) => { setUseOn(date); add({ listingId: id, qty: n, deliveryDate: date, useOn: date }); setTab('browse'); }} />
       )}
     </div>
   );

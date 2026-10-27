@@ -10,6 +10,9 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
   const { t } = useTranslation();
   const [copied, setCopied] = useState('');
   const c = boot.config;
+  // Hub days toggled in quick succession each build on the last click, not on a stale copy from the server
+  const [hubLocal, setHubLocal] = useState<number[]>();
+  const hubDays = hubLocal ?? c.hubDays;
 
   const change = async (patch: Partial<ModelConfig>) => {
     await api('/config', { method: 'PUT', body: JSON.stringify(patch) });
@@ -69,9 +72,14 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
                   <div className="font-medium">{t('hubDaysLabel')}</div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {[1, 2, 3, 4, 5, 6, 0].map((day) => {
-                      const on = c.hubDays.includes(day);
+                      const on = hubDays.includes(day);
                       return (
-                        <button key={day} aria-pressed={on} onClick={() => change({ hubDays: on ? c.hubDays.filter((x) => x !== day) : [...c.hubDays, day] })}
+                        <button key={day} aria-pressed={on} onClick={() => {
+                          const next = on ? hubDays.filter((x) => x !== day) : [...hubDays, day];
+                          if (next.length === 0) return; // the hub must run on at least one day
+                          setHubLocal(next);
+                          void change({ hubDays: next }).then(() => setHubLocal(undefined));
+                        }}
                           className={`rounded border px-2 py-0.5 ${on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white'}`}>{WEEKDAYS.en[day]}</button>
                       );
                     })}

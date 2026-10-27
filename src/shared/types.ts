@@ -36,6 +36,8 @@ export type Category = {
   deliveryDays: number[];
   /** Minimum days notice a producer typically needs. */
   leadDays: number;
+  /** How many days after delivery the goods stay good, unless the producer sets their own for a listing. */
+  shelfLifeDays: number;
 };
 
 export type Unit = 'litre' | 'kg' | 'dozen' | 'loaf' | 'each' | 'crate';
@@ -57,6 +59,8 @@ export type Listing = {
   pricePerUnit: number; // GBP
   minOrder: number;
   leadDays?: number; // overrides category default
+  /** Days after delivery the goods stay good; the producer's own figure, else the category's. */
+  shelfLifeDays?: number;
   /** Volume tiers (used when the pricing model is `tiers`): order >= minQty pays `price` per unit. */
   tiers?: { minQty: number; price: number }[];
   certifications: string[];
@@ -83,9 +87,10 @@ export type OrderStatus = 'placed' | 'confirmed' | 'picked' | 'delivered' | 'sho
 /** Whether the order currently holds stock: none, a soft hold awaiting confirmation, or firmly reserved. */
 export type StockState = 'none' | 'held' | 'reserved';
 
-export type OrderLine = { listingId: string; productId: string; qty: number; unitPrice: number };
+/** `note` is for the producer, about this item only. */
+export type OrderLine = { listingId: string; productId: string; qty: number; unitPrice: number; note?: string };
 
-/** One order is always between one buyer and one producer; a checkout with several producers makes several orders sharing a groupId. */
+/** One order is always between one buyer and one producer for one delivery day; a checkout with several producers or several days makes several orders sharing a groupId. */
 export type Order = {
   id: string; // display reference, e.g. BL-1001
   groupId: string;

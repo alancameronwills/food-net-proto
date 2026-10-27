@@ -16,17 +16,17 @@ import { parseOrganisations } from './organisations';
 
 /** Deterministic demo data, with all dates relative to `today`. */
 
-const cat = (id: Category['id'], en: string, cy: string, maxDriveKm: number, deliveryDays: number[], leadDays: number): Category =>
-  ({ id, name: { en, cy }, maxDriveKm, deliveryDays, leadDays });
+const cat = (id: Category['id'], en: string, cy: string, maxDriveKm: number, deliveryDays: number[], leadDays: number, shelfLifeDays: number): Category =>
+  ({ id, name: { en, cy }, maxDriveKm, deliveryDays, leadDays, shelfLifeDays });
 
 export const CATEGORIES: Category[] = [
-  cat('milk', 'Milk & cream', 'Llaeth a hufen', 20, [1, 2, 3, 4, 5, 6], 1),
-  cat('bread', 'Bread & bakes', 'Bara a theisennau', 30, [1, 2, 3, 4, 5, 6], 1),
-  cat('eggs', 'Eggs', 'Wyau', 40, [2, 4, 6], 1),
-  cat('veg', 'Vegetables', 'Llysiau', 40, [2, 4, 6], 2),
-  cat('fish', 'Fish & shellfish', 'Pysgod a physgod cregyn', 60, [2, 4, 5], 1),
-  cat('meat', 'Meat', 'Cig', 60, [2, 4, 5], 2),
-  cat('cheese', 'Cheese', 'Caws', 100, [3], 3),
+  cat('milk', 'Milk & cream', 'Llaeth a hufen', 20, [1, 2, 3, 4, 5, 6], 1, 2),
+  cat('bread', 'Bread & bakes', 'Bara a theisennau', 30, [1, 2, 3, 4, 5, 6], 1, 2),
+  cat('eggs', 'Eggs', 'Wyau', 40, [2, 4, 6], 1, 14),
+  cat('veg', 'Vegetables', 'Llysiau', 40, [2, 4, 6], 2, 7),
+  cat('fish', 'Fish & shellfish', 'Pysgod a physgod cregyn', 60, [2, 4, 5], 1, 2),
+  cat('meat', 'Meat', 'Cig', 60, [2, 4, 5], 2, 5),
+  cat('cheese', 'Cheese', 'Caws', 100, [3], 3, 60),
 ];
 
 const prod = (

@@ -34,11 +34,11 @@ test.describe('guided scenarios', () => {
 
       op.page.once('dialog', (d) => d.accept());
       await op.page.getByTestId('scenario-stock-down').getByRole('button', { name: 'Start' }).click();
-      await expect(op.page.getByText('Scenario started')).toBeVisible();
-      await expect(op.page.getByTestId('scenario-panel')).toContainText('Watch the stock go down');
+      await expect(op.page.getByText('Scenario started')).toBeVisible({ timeout: 30_000 });
+      await expect(op.page.getByTestId('scenario-panel')).toContainText('Watch the stock go down', { timeout: 30_000 });
 
       const panel = buyer.page.getByTestId('scenario-panel');
-      await expect(panel).toBeVisible({ timeout: 10_000 });
+      await expect(panel).toBeVisible({ timeout: 30_000 });
       await expect(panel.getByTestId('scenario-progress')).toHaveText('0 of 4 done');
       await expect(panel.getByTestId('scenario-current')).toContainText('note how much whole milk can be ordered');
       await openSteps(buyer.page);

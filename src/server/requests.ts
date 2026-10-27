@@ -261,8 +261,8 @@ async function fulfil(
     const at = new Date().toISOString();
     const order: Order = {
       id: `BL-${1000 + seq}`, groupId: `g-${requestId}-${bid.id}`, buyerId: r.buyerId, producerId, deliveryDate: r.deliveryDate,
-      status: 'confirmed', stock: 'reserved', deliveryMode: ctx.config.delivery as Order['deliveryMode'], lines: [{ listingId, productId: r.productId, qty, unitPrice: bid.price }],
-      total: Math.round(qty * bid.price * 100) / 100, note: r.note, source: { requestId, bidId: bid.id }, createdAt: at,
+      status: 'confirmed', stock: 'reserved', deliveryMode: ctx.config.delivery as Order['deliveryMode'], lines: [{ listingId, productId: r.productId, qty, unitPrice: bid.price, ...(r.note ? { note: r.note } : {}) }],
+      total: Math.round(qty * bid.price * 100) / 100, source: { requestId, bidId: bid.id }, createdAt: at,
       history: [{ at, status: 'confirmed', by }],
     };
     const filledQty = r.filledQty + qty;

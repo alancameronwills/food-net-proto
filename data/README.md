@@ -16,7 +16,7 @@ Each entry:
 | `lat`, `lon` | location; drive distances to everyone else are calculated from these (straight line x 1.35) |
 | `blurb` | `{ "en": "...", "cy": "..." }`; `cy` is optional and falls back to English |
 | `certifications` | producers only, optional, e.g. `["organic"]` |
-| `offers` | producers only: `{ "product": "<product id>", "price": 1.50, "minOrder": 5 }` |
+| `offers` | producers only: `{ "product": "<product id>", "price": 1.50, "minOrder": 5 }`; optionally `"shelfLifeDays": 5` (how long it keeps after delivery; otherwise the usual for the product type: milk, bread and fish 2 days, meat 5, vegetables 7, eggs 14, cheese 60). Producers can also change this in the app |
 
 Product ids you can offer: milk-whole, milk-semi, cream-double, eggs-free, bread-sour, bara-brith, veg-leek,
 veg-potato, veg-carrot, veg-tomato, veg-kale, meat-lamb, meat-beef, meat-sausage, fish-crab, fish-lobster,

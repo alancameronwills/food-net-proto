@@ -86,7 +86,7 @@ export const SCENARIOS: Scenario[] = [
     config: {},
     available: true,
     steps: [
-      { who: 'grand-hotel', text: b('Add free-range eggs, sourdough (Nevern Bakery) and fish (Dinas Catch) to the basket for one delivery day. Note “separate invoices”.', 'Ychwanegwch wyau buarth, surdoes (Nevern Bakery) a physgod (Dinas Catch) at y fasged ar gyfer un diwrnod dosbarthu. Nodwch “anfonebau ar wahân”.') },
+      { who: 'grand-hotel', text: b('Add free-range eggs, sourdough (Nevern Bakery) and fish (Dinas Catch) to the basket. Note “separate invoices”.', 'Ychwanegwch wyau buarth, surdoes (Nevern Bakery) a physgod (Dinas Catch) at y fasged. Nodwch “anfonebau ar wahân”.') },
       { who: 'grand-hotel', text: b('Place the order: three orders are created, one per producer.', 'Gosodwch yr archeb: crëir tair archeb, un i bob cynhyrchydd.'), done: count('order_placed', 3) },
       { who: 'operator', text: b('In Model Lab, switch Operator role to Food hub. Look at a basket again: one invoice, one delivery.', 'Yn Labordy Modelau, newidiwch Rôl y gweithredwr i Ganolfan fwyd. Edrychwch ar fasged eto: un anfoneb, un danfoniad.') },
     ],

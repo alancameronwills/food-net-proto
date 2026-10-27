@@ -47,7 +47,7 @@ export function OrderCard({ order, boot, perspective, banner, actions }: {
             const got = deliveredQty.get(l.listingId);
             return (
               <tr key={l.listingId} className="border-t border-slate-100">
-                <td className="py-1">{p ? loc(p.name) : l.productId}</td>
+                <td className="py-1">{p ? loc(p.name) : l.productId}{l.note && <div data-testid="line-note" className="text-xs italic text-slate-600">“{l.note}”</div>}</td>
                 <td className="py-1">
                   {done && got !== l.qty ? <><s className="text-slate-400">{l.qty}</s> <b data-testid="delivered-qty" className="text-orange-800">{got}</b></> : l.qty} {p ? t(`units.${p.unit}`) : ''}
                 </td>

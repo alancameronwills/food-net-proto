@@ -36,9 +36,11 @@ export function parseOrganisations(raw: unknown, productIds: Set<string>, areaId
         offered.add(o.product);
         if (!isNum(o.price) || o.price <= 0) return bad(`offers[${j}]: "price" must be a positive number`);
         if (!isNum(o.minOrder) || o.minOrder <= 0) return bad(`offers[${j}]: "minOrder" must be a positive number`);
+        if (o.shelfLifeDays !== undefined && !(Number.isInteger(o.shelfLifeDays) && o.shelfLifeDays >= 1 && o.shelfLifeDays <= 730)) return bad(`offers[${j}]: "shelfLifeDays" must be a whole number of days from 1 to 730`);
         listings.push({
           id: `${r.id}:${o.product}`, producerId: r.id, productId: o.product,
           pricePerUnit: o.price, minOrder: o.minOrder, certifications: Array.isArray(r.certifications) ? r.certifications : [],
+          ...(o.shelfLifeDays !== undefined ? { shelfLifeDays: o.shelfLifeDays } : {}),
         });
       });
       if (r.routes !== undefined) {
