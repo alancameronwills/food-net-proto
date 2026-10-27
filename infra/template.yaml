@@ -1,0 +1,316 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Bwyd Lleol Bro Teifi prototype: a Lambda API behind API Gateway, a DynamoDB on-demand table, and the web app in a
+  private S3 bucket, all served from one CloudFront address. Everything is pay-per-use, so an idle stack costs
+  pennies a month. Written with the long form of CloudFormation functions (Ref, Fn::Sub ...) so the file is plain YAML.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: demo
+    AllowedPattern: '^[a-z0-9-]{1,20}$'
+    Description: Short name for this copy of the system (demo, trial, ...). Resources are named from it.
+  CodeBucket:
+    Type: String
+    Description: S3 bucket holding the Lambda package (created by the deploy script).
+  CodeKey:
+    Type: String
+    Description: S3 key of the Lambda package.
+  MemorySize:
+    Type: Number
+    Default: 1024
+    AllowedValues: [512, 1024, 1536, 2048]
+    Description: Lambda memory in MB. More memory is also more CPU, so a quicker response; the cost per request barely changes.
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+  ThrottleRate:
+    Type: Number
+    Default: 150
+    Description: >
+      Most API requests per second, a guard against a runaway bill. Each open screen makes about two requests a second,
+      so 150 comfortably serves 50 people at once, and at the worst costs a few dollars an hour.
+  ThrottleBurst:
+    Type: Number
+    Default: 300
+  BudgetEmail:
+    Type: String
+    Default: ''
+    Description: Optional. An email address to warn when the account's monthly spend nears BudgetUsd. Leave empty for no budget alert.
+  BudgetUsd:
+    Type: Number
+    Default: 10
+  WarmSchedule:
+    Type: String
+    Default: ''
+    Description: >
+      Optional. A schedule such as "rate(5 minutes)" that keeps the API warm. Leave empty to rely on the warmup command
+      before a session, which costs nothing while idle.
+
+Conditions:
+  HasBudgetEmail:
+    Fn::Not: [{ Fn::Equals: [{ Ref: BudgetEmail }, ''] }]
+  HasWarmSchedule:
+    Fn::Not: [{ Fn::Equals: [{ Ref: WarmSchedule }, ''] }]
+
+Resources:
+  # ---- data ----------------------------------------------------------------------------------------------
+  Table:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Delete
+    Properties:
+      TableName: { 'Fn::Sub': 'bwyd-lleol-${Stage}' }
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+
+  # ---- API -----------------------------------------------------------------------------------------------
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - { 'Fn::Sub': 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole' }
+      Policies:
+        - PolicyName: table-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Only this table. TransactWriteItems is covered by the item-level write permissions.
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:UpdateItem'
+                  - 'dynamodb:DeleteItem'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:BatchWriteItem'
+                  - 'dynamodb:DescribeTable'
+                Resource: { 'Fn::GetAtt': [Table, Arn] }
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: { 'Fn::Sub': '/aws/lambda/bwyd-lleol-${Stage}-api' }
+      RetentionInDays: { Ref: LogRetentionDays }
+
+  Function:
+    Type: AWS::Lambda::Function
+    DependsOn: LogGroup
+    Properties:
+      FunctionName: { 'Fn::Sub': 'bwyd-lleol-${Stage}-api' }
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      Handler: index.handler
+      Role: { 'Fn::GetAtt': [FunctionRole, Arn] }
+      MemorySize: { Ref: MemorySize }
+      Timeout: 25
+      Code:
+        S3Bucket: { Ref: CodeBucket }
+        S3Key: { Ref: CodeKey }
+      Environment:
+        Variables:
+          TABLE_NAME: { Ref: Table }
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: { 'Fn::Sub': 'bwyd-lleol-${Stage}' }
+      ProtocolType: HTTP
+
+  ApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: { Ref: HttpApi }
+      IntegrationType: AWS_PROXY
+      IntegrationUri: { 'Fn::GetAtt': [Function, Arn] }
+      PayloadFormatVersion: '2.0'
+
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: { Ref: HttpApi }
+      RouteKey: '$default'
+      Target: { 'Fn::Sub': 'integrations/${ApiIntegration}' }
+
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: { Ref: HttpApi }
+      StageName: '$default'
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingRateLimit: { Ref: ThrottleRate }
+        ThrottlingBurstLimit: { Ref: ThrottleBurst }
+
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: { Ref: Function }
+      Principal: apigateway.amazonaws.com
+      SourceArn: { 'Fn::Sub': 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*' }
+
+  # Optional keep-warm schedule: calls the health route as an HTTP API request would
+  WarmRule:
+    Type: AWS::Events::Rule
+    Condition: HasWarmSchedule
+    Properties:
+      ScheduleExpression: { Ref: WarmSchedule }
+      State: ENABLED
+      Targets:
+        - Id: warm
+          Arn: { 'Fn::GetAtt': [Function, Arn] }
+          Input: >-
+            {"version":"2.0","routeKey":"$default","rawPath":"/api/health","rawQueryString":"",
+            "headers":{"accept":"application/json","host":"warm.internal"},
+            "requestContext":{"domainName":"warm.internal","stage":"$default",
+            "http":{"method":"GET","path":"/api/health","protocol":"HTTP/1.1","sourceIp":"127.0.0.1","userAgent":"keep-warm"}},
+            "isBase64Encoded":false}
+
+  WarmInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasWarmSchedule
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: { Ref: Function }
+      Principal: events.amazonaws.com
+      SourceArn: { 'Fn::GetAtt': [WarmRule, Arn] }
+
+  # ---- web app -------------------------------------------------------------------------------------------
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  SiteAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: { 'Fn::Sub': 'bwyd-lleol-${Stage}-site' }
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # The app is one page with its own routes (/home, /lab ...). Anything that is not a file is served as index.html.
+  SpaRewrite:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: { 'Fn::Sub': 'bwyd-lleol-${Stage}-spa' }
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Serve index.html for app routes
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          if (request.uri.indexOf('.') === -1) { request.uri = '/index.html'; }
+          return request;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: { 'Fn::Sub': 'Bwyd Lleol Bro Teifi (${Stage})' }
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        DefaultRootObject: index.html
+        Origins:
+          - Id: site
+            DomainName: { 'Fn::GetAtt': [SiteBucket, RegionalDomainName] }
+            OriginAccessControlId: { 'Fn::GetAtt': [SiteAccessControl, Id] }
+            S3OriginConfig: { OriginAccessIdentity: '' }
+          - Id: api
+            DomainName: { 'Fn::Sub': '${HttpApi}.execute-api.${AWS::Region}.amazonaws.com' }
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          # Managed policies: CachingOptimized, and SecurityHeadersPolicy
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: { 'Fn::GetAtt': [SpaRewrite, FunctionMetadata.FunctionARN] }
+        CacheBehaviors:
+          # The API: never cached, and every header the app sends (session, role) reaches it
+          - PathPattern: '/api/*'
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            Compress: true
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            # Managed policies: CachingDisabled, and AllViewerExceptHostHeader
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: { Ref: SiteBucket }
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontToRead
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: 's3:GetObject'
+            Resource: { 'Fn::Sub': '${SiteBucket.Arn}/*' }
+            Condition:
+              StringEquals:
+                'AWS:SourceArn': { 'Fn::Sub': 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}' }
+
+  # ---- cost guard ----------------------------------------------------------------------------------------
+  Budget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudgetEmail
+    Properties:
+      Budget:
+        BudgetName: { 'Fn::Sub': 'bwyd-lleol-${Stage}' }
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: { Ref: BudgetUsd }, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: { Ref: BudgetEmail } }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: { Ref: BudgetEmail } }]
+
+Outputs:
+  SiteUrl:
+    Description: Where people go
+    Value: { 'Fn::Sub': 'https://${Distribution.DomainName}' }
+  SiteBucketName:
+    Value: { Ref: SiteBucket }
+  DistributionId:
+    Value: { Ref: Distribution }
+  FunctionName:
+    Value: { Ref: Function }
+  TableName:
+    Value: { Ref: Table }
+  ApiEndpoint:
+    Description: The API directly (people use SiteUrl, which routes /api here)
+    Value: { 'Fn::Sub': 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com' }

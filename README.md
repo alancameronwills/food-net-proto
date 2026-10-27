@@ -43,6 +43,7 @@ Then open `http://localhost:5173/lab?s=<session>&as=operator` (any session name;
 | `npm run check:data` | Validate `data/organisations.json` |
 | `npm run reset` | Reload the starting data into the `default` session |
 | `npm run build` | Build the web app into `dist/web` |
+| `npm run aws -- help` | Put it on AWS, warm it up, check it, take it away (see DEPLOY.md) |
 
 ## How it is put together
 
@@ -50,6 +51,8 @@ Then open `http://localhost:5173/lab?s=<session>&as=operator` (any session name;
     src/shared/           rules shared by browser and server: models, orders, delivery, reliability, scenarios
     src/server/           Hono API; DynamoDB single-table store; stock reservation, orders, requests, events
     src/web/              React + Tailwind single-page app; role screens in pages/
+    infra/                CloudFormation template for AWS
+    scripts/              deploy, warm-up and destroy commands for AWS (see DEPLOY.md)
     tests/                Vitest unit and DynamoDB Local integration tests
     e2e/                  Playwright scenarios, including several people at once in separate browser contexts
 
@@ -72,6 +75,7 @@ Not built yet:
 
 - **Standing orders** (the forward-commitment market model).
 - **Email notifications** (in-app only).
-- **Deployment to AWS.** The design is serverless (Lambda, DynamoDB on-demand, S3 + CloudFront, near-zero idle cost);
-  `src/server/lambda.ts` is the Lambda entry point. A deploy script has not been written, and nothing has been
-  pushed to GitHub. Both are deliberately waiting for approval of the local prototype.
+- **Anything beyond the prototype:** sign-in, a custom domain, email notifications.
+
+Deploying to AWS (Lambda, DynamoDB on-demand, S3 + CloudFront, near-zero idle cost) is scripted: see **[DEPLOY.md](DEPLOY.md)**.
+The script and template are written and checked, but no deployment has been made yet.

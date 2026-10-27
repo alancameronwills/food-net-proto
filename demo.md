@@ -31,7 +31,8 @@ Say plainly what isn't there yet: *"Regular standing orders are the next piece."
 
 1. **Start the app** (on this machine): Docker Desktop running, then
    `npm run db:up`, `npm run seed`, `npm run dev`. Open http://localhost:5173.
-   (Once deployed to AWS, use the deployed address instead; open it a few minutes early so it is warm.)
+   (On AWS, use the deployed address instead and run `npm run aws -- warmup --concurrency 10` a few minutes before
+   people arrive, with the number being about how many will arrive together. See DEPLOY.md.)
 2. **Pick a session name** for this demo, e.g. `demo-july`. Everything is private to that name, so you can run
    different demos side by side and reset one without affecting another. Open:
    `http://localhost:5173/lab?s=demo-july&as=operator` (the operator view, your control panel).
