@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Bwyd Lleol Bro Teifi prototype: a Lambda API behind API Gateway, a DynamoDB on-demand table, and the web app in a
+  Bwyd Bro'r Garreg Las prototype: a Lambda API behind API Gateway, a DynamoDB on-demand table, and the web app in a
   private S3 bucket, all served from one CloudFront address. Everything is pay-per-use, so an idle stack costs
   pennies a month. Written with the long form of CloudFormation functions (Ref, Fn::Sub ...) so the file is plain YAML.
 
@@ -231,7 +231,7 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: { 'Fn::Sub': 'Bwyd Lleol Bro Teifi (${Stage})' }
+        Comment: { 'Fn::Sub': 'Bwyd Bro''r Garreg Las (${Stage})' }
         PriceClass: PriceClass_100
         HttpVersion: http2and3
         DefaultRootObject: index.html

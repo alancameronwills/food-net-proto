@@ -1,4 +1,4 @@
-# Demo guide: Bwyd Lleol Bro Teifi prototype
+# Demo guide: Bwyd Bro'r Garreg Las prototype
 
 How to run a demo of the prototype for prospective **producers** and **buyers** (restaurants, hotels, caterers, shops).
 It is written for a Zoom session where a few people role-play, but works in a room too.

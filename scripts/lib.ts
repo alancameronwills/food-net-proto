@@ -92,7 +92,7 @@ export function formatBytes(n: number): string {
   return n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export const HELP = `Bwyd Lleol Bro Teifi: deploy to AWS
+export const HELP = `Bwyd Bro'r Garreg Las: deploy to AWS
 
   npm run aws -- <command> [options]
 

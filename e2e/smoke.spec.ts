@@ -18,7 +18,7 @@ test('role picker offers buyers, producers and the operator', async ({ page }) =
   await page.evaluate(() => localStorage.removeItem('persona'));
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Who are you playing today?' })).toBeVisible();
-  for (const name of ['Grand Hotel', 'Dyfed Dairy', 'Bwyd Lleol Bro Teifi']) {
+  for (const name of ['Grand Hotel', 'Dyfed Dairy', "Bwyd Bro'r Garreg Las"]) {
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
 });
@@ -107,7 +107,7 @@ test('every page carries a red banner under the top line saying this is a protot
   expect(b).toBeLessThan(90);
 
   // A full-width strip directly below the top line, which keeps its usual arrangement
-  const title = await page.getByRole('link', { name: /Bwyd Lleol Bro Teifi/ }).boundingBox();
+  const title = await page.getByRole('link', { name: /Bwyd Bro'r Garreg Las/ }).boundingBox();
   const lang = await page.getByRole('button', { name: 'Cymraeg' }).boundingBox();
   const box = await banner.boundingBox();
   const viewport = page.viewportSize()!;

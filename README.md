@@ -1,4 +1,4 @@
-# Bwyd Lleol Bro Teifi: local food network prototype
+# Bwyd Bro'r Garreg Las: local food network prototype
 
 A web prototype for bringing together buyers (restaurants, hotels, caterers, shops) and producers (farms, fishers,
 bakers, butchers, dairies, packers) of local food in the Teifi Valley. It is built to be **demonstrated and discussed**:

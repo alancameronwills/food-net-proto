@@ -23,7 +23,7 @@ test.describe('when something goes wrong', () => {
     await expect(crash).toContainText('This screen hit a problem');
     await expect(crash.getByRole('button', { name: 'Reload' })).toBeVisible();
     // The header is still there, so people can switch role or language
-    await expect(page.getByRole('link', { name: /Bwyd Lleol Bro Teifi/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Bwyd Bro'r Garreg Las/ })).toBeVisible();
     await page.getByRole('button', { name: 'Cymraeg' }).click();
     await expect(crash).toContainText('Cafodd y sgrin hon broblem');
   });
