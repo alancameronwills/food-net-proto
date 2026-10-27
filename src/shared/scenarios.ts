@@ -20,6 +20,8 @@ export type Scenario = {
   /** Model settings applied at the start (anything not listed returns to its default). */
   config: Record<string, unknown>;
   steps: ScenarioStep[];
+  /** True if the scenario is about demand requests: starting it switches them on, even if the operator had them off. */
+  usesDemand?: boolean;
   /** False for scenarios that depend on something not built yet; they are listed but cannot be started. */
   available: boolean;
   unavailableReason?: Bilingual;
@@ -71,6 +73,7 @@ export const SCENARIOS: Scenario[] = [
     title: b('Ask for something not yet available', 'Gofyn am rywbeth nad yw ar gael eto'),
     summary: b('A buyer asks for heritage tomatoes in three weeks. Two producers bid; the buyer chooses.', 'Mae prynwr yn gofyn am domatos treftadaeth ymhen tair wythnos. Mae dau gynhyrchydd yn cynnig; y prynwr sy’n dewis.'),
     config: { speculative: 'open_rfq' },
+    usesDemand: true,
     available: true,
     steps: [
       { who: 'corner-deli', text: b('In Ask for something, request 40 kg of Heritage tomatoes in three weeks, with a price you would pay.', 'Yn Gofyn am rywbeth, gofynnwch am 40 kg o domatos treftadaeth ymhen tair wythnos, gyda phris y byddech yn ei dalu.'), done: count('request_new') },

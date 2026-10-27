@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DIMENSIONS, PRESETS, presetConfig, type ModelConfig } from '../../shared/models';
+import { DIMENSIONS, PRESETS, presetChanges, type ModelConfig } from '../../shared/models';
 import type { Persona } from '../../shared/types';
 import { api, ctx, type Bootstrap } from '../api';
 import { WEEKDAYS } from '../../shared/delivery';
@@ -55,13 +55,24 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
         <p className="mb-2 text-sm text-slate-600">{t('presetsHint')}</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {PRESETS.map((p) => (
-            <button key={p.id} data-testid={`preset-${p.id}`} onClick={() => change(presetConfig(p))}
+            <button key={p.id} data-testid={`preset-${p.id}`} onClick={() => change(presetChanges(p))}
               className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm hover:border-brand hover:shadow-md">
               <div className="font-semibold text-brand">{loc(p.label)}</div>
               <div className="mt-1 text-xs text-slate-600">{loc(p.explain)}</div>
             </button>
           ))}
         </div>
+      </section>
+
+      <section data-testid="demand-setting" className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="min-w-64 flex-1">
+          <h2 className="text-lg font-semibold text-brand-dark">{t('demandSwitchTitle')}</h2>
+          <p className="text-sm text-slate-600">{t('demandSwitchHelp')}</p>
+        </div>
+        <button role="switch" aria-checked={c.demandOn} data-testid="demand-toggle" onClick={() => change({ demandOn: !c.demandOn })}
+          className={`rounded-full border-2 px-5 py-1.5 font-semibold ${c.demandOn ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-400 bg-white text-slate-700'}`}>
+          {c.demandOn ? t('demandOnLabel') : t('demandOffLabel')}
+        </button>
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">

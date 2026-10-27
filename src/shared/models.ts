@@ -138,6 +138,8 @@ export type ModelConfig = {
   flatRadiusKm: number;
   /** Weekdays (0 = Sunday) on which the hub courier makes deliveries. */
   hubDays: number[];
+  /** Demand requests (asking for things not yet listed, and bidding): off hides them from every screen. */
+  demandOn: boolean;
 };
 
 export const DEFAULT_CONFIG: ModelConfig = {
@@ -153,6 +155,7 @@ export const DEFAULT_CONFIG: ModelConfig = {
   forecastPct: 0.7,
   flatRadiusKm: 50,
   hubDays: [2, 4, 6],
+  demandOn: true,
 };
 
 /** Validate an untrusted partial config against the dimension table. */
@@ -170,6 +173,7 @@ export function sanitiseConfig(input: Record<string, unknown>, base: ModelConfig
   if (typeof input.flatRadiusKm === 'number' && input.flatRadiusKm >= 1 && input.flatRadiusKm <= 500) {
     out.flatRadiusKm = input.flatRadiusKm;
   }
+  if (typeof input.demandOn === 'boolean') out.demandOn = input.demandOn;
   if (Array.isArray(input.hubDays)) {
     const days = [...new Set(input.hubDays.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
     if (days.length > 0) out.hubDays = days;
@@ -180,7 +184,9 @@ export function sanitiseConfig(input: Record<string, unknown>, base: ModelConfig
 /** What the UI / server rules should do under a config, so callers don't branch on option ids. */
 export function capabilities(c: ModelConfig) {
   return {
-    showDemandBoard: c.market === 'rfq' || c.market === 'catalogue',
+    /** Demand requests are switched on at all (the operator can turn the whole feature off). */
+    demandOn: c.demandOn,
+    showDemandBoard: c.demandOn && (c.market === 'rfq' || c.market === 'catalogue'),
     showStandingOrders: c.market === 'forward',
     consolidatedInvoice: c.operator === 'hub',
     deliveryRequiresSlot: c.delivery === 'area_days',
@@ -227,7 +233,7 @@ export const PRESETS: Preset[] = [
     id: 'demand-led',
     label: { en: 'Demand-led', cy: 'Wedi’i arwain gan alw' },
     explain: { en: 'Buyers ask, producers bid; pooled demand; producer rounds by area.', cy: 'Prynwyr yn gofyn, cynhyrchwyr yn cynnig; galw cyfun; rowndiau cynhyrchwyr yn ôl ardal.' },
-    config: { market: 'rfq', speculative: 'pooled', delivery: 'area_days' },
+    config: { market: 'rfq', speculative: 'pooled', delivery: 'area_days', demandOn: true },
   },
   {
     id: 'instant',
@@ -238,3 +244,9 @@ export const PRESETS: Preset[] = [
 ];
 
 export const presetConfig = (p: Preset): ModelConfig => sanitiseConfig(p.config as Record<string, unknown>, DEFAULT_CONFIG);
+
+/** What applying a preset changes: every switch, except demand requests unless the preset is about them. */
+export function presetChanges(p: Preset): Partial<ModelConfig> {
+  const { demandOn, ...rest } = presetConfig(p);
+  return 'demandOn' in p.config ? { ...rest, demandOn } : rest;
+}

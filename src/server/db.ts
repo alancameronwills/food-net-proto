@@ -141,7 +141,8 @@ export function session(id: string) {
       await doc.send(new DeleteCommand({ TableName: TABLE, Key: { pk: P(kind), sk } }));
     },
     /** Delete every item of the given kinds in this session. */
-    async clear(kinds: string[]) {
+    /** Delete every item of the given kinds; `keep` names one item per kind (kind -> sk) to leave in place. */
+    async clear(kinds: string[], keep: Record<string, string> = {}) {
       for (const kind of kinds) {
         const r = await doc.send(new QueryCommand({
           TableName: TABLE,
@@ -149,8 +150,8 @@ export function session(id: string) {
           ExpressionAttributeValues: { ':pk': P(kind) },
           ProjectionExpression: 'pk, sk',
         }));
-        await batch((r.Items ?? []).map((i) => ({ DeleteRequest: { Key: { pk: i.pk, sk: i.sk } } })));
-        if (r.LastEvaluatedKey) await this.clear([kind]);
+        await batch((r.Items ?? []).filter((i) => i.sk !== keep[kind]).map((i) => ({ DeleteRequest: { Key: { pk: i.pk, sk: i.sk } } })));
+        if (r.LastEvaluatedKey) await this.clear([kind], keep);
       }
     },
     async putMany(kind: string, rows: { sk: string; data: object }[]) {

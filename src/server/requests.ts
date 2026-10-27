@@ -33,6 +33,7 @@ function inRange(ctx: Ctx, buyerId: string, producerId: string, category: Catego
 }
 
 const remaining = (r: DemandRequest) => r.qty - r.filledQty;
+const OFF = 'Demand requests are switched off. The network operator can switch them on in the Model Lab.';
 
 function requestProblemText(problem: DeliveryProblem, product: string, lead: number): string {
   switch (problem) {
@@ -61,6 +62,7 @@ const orgName = async (s: Session, id: string) => (await s.get<Organisation>('OR
 /** Requests as the asking organisation may see them. Producers see only their own bids (bidding is sealed). */
 export async function listRequests(s: Session, actor: Organisation | undefined): Promise<RequestView[]> {
   if (!actor) return [];
+  if (!(await getConfig(s)).demandOn) return []; // kept, but out of sight until switched back on
   const all = await s.list<DemandRequest>('REQUEST');
   const ctx = await load(s);
   const catOf = (r: DemandRequest) => ctx.categories.get(ctx.products.get(r.productId)!.category)!;
@@ -96,6 +98,7 @@ export async function listRequests(s: Session, actor: Organisation | undefined):
 export async function createRequest(s: Session, actor: Organisation | undefined, body: Record<string, any>): Promise<Result<{ request: RequestView }>> {
   if (actor?.role !== 'buyer') return fail(403, 'Only buyers can make requests');
   const ctx = await load(s);
+  if (!ctx.config.demandOn) return fail(409, OFF);
   const product = ctx.products.get(body.productId);
   const category = product && ctx.categories.get(product.category);
   if (!product || !category) return fail(400, 'Unknown product');
@@ -153,6 +156,7 @@ type BidBody = { price?: unknown; qty?: unknown; note?: unknown };
 export async function placeBid(s: Session, actor: Organisation | undefined, id: string, body: BidBody): Promise<Result<{ bids: Bid[] }>> {
   if (actor?.role !== 'producer') return fail(403, 'Only producers can bid');
   const ctx = await load(s);
+  if (!ctx.config.demandOn) return fail(409, OFF);
   if (ctx.config.speculative === 'first_accept') return fail(409, 'Under first-to-accept there is no bidding: accept the buyer\'s price instead');
   if (!isMoney(body.price)) return fail(400, 'price must be a positive number');
   if (!isQty(body.qty)) return fail(400, 'qty must be a whole number of at least 1');
@@ -320,6 +324,7 @@ export async function acceptBid(s: Session, actor: Organisation | undefined, id:
 export async function takeRequest(s: Session, actor: Organisation | undefined, id: string): Promise<Result<{ order: Order; request: RequestView }>> {
   if (actor?.role !== 'producer') return fail(403, 'Only producers can accept a request');
   const ctx = await load(s);
+  if (!ctx.config.demandOn) return fail(409, OFF);
   if (ctx.config.speculative !== 'first_accept') return fail(409, 'Requests are not first-to-accept under the current model; place a bid instead');
   const r0 = await s.get<DemandRequest>('REQUEST', id);
   if (!r0) return fail(404, 'No such request');

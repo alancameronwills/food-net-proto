@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Persona } from '../../shared/types';
 import { useOrders, useRequests, useWindows, type Bootstrap } from '../api';
@@ -26,10 +26,13 @@ export function BuyerHome({ me, boot }: { me: Persona; boot: Bootstrap }) {
   const { data: requests = [], reload: reloadRequests } = useRequests();
   const openRequests = requests.filter((r) => r.status === 'open').length;
 
+  const demandOn = boot.config.demandOn;
+  // If the operator switches demand requests off while this tab is open, go back to browsing
+  useEffect(() => { if (!demandOn && tab === 'requests') setTab('browse'); }, [demandOn, tab]);
   const tabs: [Tab, string][] = [
     ['browse', t('browseTab')],
     ['planner', t('plannerTab')],
-    ['requests', `${t('requestsTab')}${openRequests ? ` (${openRequests})` : ''}`],
+    ...(demandOn ? [['requests', `${t('requestsTab')}${openRequests ? ` (${openRequests})` : ''}`] as [Tab, string]] : []),
     ['orders', `${t('ordersTab')}${orders.length ? ` (${orders.length})` : ''}`],
   ];
   return (

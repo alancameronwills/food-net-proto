@@ -136,6 +136,12 @@ Ask both sides: *Who should carry the cost of a short delivery? How much notice 
 
 ### 5. Ask for something not yet available (10 min) *(30-minute version)*
 
+*Leaving this out for an audience (for example, producers who only want to see stock and orders)?* At the top of the
+Model Lab, switch **Demand requests** to **Off**: the *Ask for something* and *Demand board* tabs disappear from every
+screen at once, and requests already made are kept and come back when you switch it on again. Presets other than
+*Demand-led* leave the switch as you set it, and starting a guided scenario that is about demand (*Ask for something
+not yet available*) switches it back on for you. **Reset demo data** restores the starting settings, which have it on.
+
 This is the feature the network is built around: buyers can plan, and producers can respond to demand.
 
 1. As **Corner Deli**, open **Ask for something**. Request **40 kg of Heritage tomatoes** in three weeks, with a price you'd
@@ -205,7 +211,7 @@ step needs, which also works for a single presenter hopping between roles.
 | Plan next week's menu | Menu planner, forecast vs in stock, ordering ahead | nothing |
 | Watch the stock go down | Order, confirm, producer's available stock falling | nothing |
 | The forecast is cut | Producer cuts a forecast; buyers are warned and offered alternatives; flags clear when it is restored | two buyers already hold orders in a forecast week |
-| Ask for something not yet available | Request, two bids, accept; the second producer gains a listing | nothing |
+| Ask for something not yet available | Request, two bids, accept; the second producer gains a listing | nothing. **Switches Demand requests on** if they were off |
 | A basket from several producers | One checkout, one order per producer; one invoice under the food hub | nothing |
 | A short delivery | Delivered short, lower total, reliability score moves | an order is waiting to be delivered |
 | Who brings it? | Producer delivery, area rounds and hub courier compared | nothing |

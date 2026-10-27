@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { orderableQty } from '../../shared/browse';
 import { addDays, mondayOf, todayIso } from '../../shared/dates';
@@ -20,6 +20,8 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
   const { data: orders = [], reload: reloadOrders } = useOrders();
   const { data: requests = [], reload: reloadRequests } = useRequests();
   const reload = () => { reloadBoot(); reloadWindows(); reloadOrders(); reloadRequests(); };
+  // If the operator switches demand requests off while this tab is open, go back to the stock screen
+  useEffect(() => { if (!boot.config.demandOn && tab === 'demand') setTab('stock'); }, [boot.config.demandOn, tab]);
   const unanswered = requests.filter((r) => r.status === 'open' && !r.bids.some((b) => b.status === 'open')).length;
   const waiting = orders.filter((o) => o.status === 'placed').length;
 
@@ -45,7 +47,7 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
       </div>
 
       <div role="tablist" className="mb-4 flex gap-2 border-b-2 border-gold">
-        {(['stock', 'listings', 'orders', 'demand'] as const).map((k) => (
+        {(['stock', 'listings', 'orders', 'demand'] as const).filter((k) => k !== 'demand' || boot.config.demandOn).map((k) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
             className={`rounded-t px-4 py-2 font-semibold ${tab === k ? 'bg-brand text-white' : 'text-brand hover:bg-brand-light'}`}>
             {k === 'orders' ? `${t('inboxTab')}${waiting ? ` (${waiting})` : ''}` : k === 'demand' ? `${t('demandTab')}${unanswered ? ` (${unanswered})` : ''}` : t(k === 'stock' ? 'tabStock' : 'tabListings')}

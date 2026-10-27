@@ -36,6 +36,7 @@ export function ScenarioLauncher() {
               {data?.active?.id === s.id && <span className="rounded bg-gold-light px-2 py-0.5 text-xs font-semibold text-amber-900">{t('scenarioRunning')}</span>}
             </div>
             <p className="mt-1 text-sm">{loc(s.summary)}</p>
+            {s.usesDemand && <p className="mt-1 text-xs text-slate-600" data-testid="uses-demand">{t('usesDemandNote')}</p>}
             {s.available ? (
               <div className="mt-3 flex items-center gap-3">
                 <button onClick={() => start(s.id)} className="rounded bg-brand px-4 py-1.5 font-semibold text-white hover:bg-brand-dark">{t('startScenario')}</button>

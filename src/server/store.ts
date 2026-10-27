@@ -9,24 +9,52 @@ export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST',
 /** Bumped whenever the starting data gains something older sessions lack; older sessions are upgraded in place on next use. */
 export const SEED_VERSION = 3;
 
+/** A reset that has not finished within this long is assumed to have died, so nobody waits for it for ever. */
+const RESET_STALE_MS = 60_000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Wipe a session and reload the starting data.
+ *
+ * While this runs the session is marked as being reset, and everyone else's requests wait for it to finish. Without
+ * that, screens polling in the middle would find an empty session (and treat the operator as a stranger), and would
+ * start a second reload on top of this one. The mark is on the session record itself, which is never deleted during
+ * the reset, so there is no moment at which the session looks as if it had never been seeded.
+ */
 export async function resetSession(id: string, today = isoDate(new Date())): Promise<void> {
   await ensureTable();
   const s = session(id);
-  await s.clear(KINDS);
-  const seed = buildSeed(today);
-  await s.putMany('ORG', seed.orgs.map((o) => ({ sk: o.id, data: o })));
-  await s.putMany('AREA', seed.areas.map((a) => ({ sk: a.id, data: a })));
-  await s.putMany('CATEGORY', seed.categories.map((c) => ({ sk: c.id, data: c })));
-  await s.putMany('PRODUCT', seed.products.map((p) => ({ sk: p.id, data: p })));
-  await s.putMany('LISTING', seed.listings.map((l) => ({ sk: l.id, data: l })));
-  await s.putMany('WINDOW', seed.windows.map((w) => ({ sk: `${w.listingId}#${w.start}`, data: w })));
-  await s.putMany('DIST', Object.entries(seed.distances).map(([from, to]) => ({ sk: from, data: { from, to } })));
-  await s.put('CONFIG', 'model', DEFAULT_CONFIG);
-  await s.put('META', 'session', { seededOn: today, version: SEED_VERSION });
+  // One reset at a time (a double click, a scenario started as someone resets)
+  for (let tries = 0; !(await s.putIfAbsent('LOCK', 'reset', { expires: Date.now() + RESET_STALE_MS })); tries++) {
+    if (tries > 300) throw new Error('Another reset of this session is taking too long');
+    await sleep(100);
+  }
+  try {
+    await s.put('META', 'session', { seededOn: today, version: SEED_VERSION, resetting: true, since: Date.now() });
+    await s.clear(KINDS, { META: 'session' }); // everything, except the record that says "reset in progress"
+    const seed = buildSeed(today);
+    await s.putMany('ORG', seed.orgs.map((o) => ({ sk: o.id, data: o })));
+    await s.putMany('AREA', seed.areas.map((a) => ({ sk: a.id, data: a })));
+    await s.putMany('CATEGORY', seed.categories.map((c) => ({ sk: c.id, data: c })));
+    await s.putMany('PRODUCT', seed.products.map((p) => ({ sk: p.id, data: p })));
+    await s.putMany('LISTING', seed.listings.map((l) => ({ sk: l.id, data: l })));
+    await s.putMany('WINDOW', seed.windows.map((w) => ({ sk: `${w.listingId}#${w.start}`, data: w })));
+    await s.putMany('DIST', Object.entries(seed.distances).map(([from, to]) => ({ sk: from, data: { from, to } })));
+    await s.put('CONFIG', 'model', DEFAULT_CONFIG);
+    await s.put('META', 'session', { seededOn: today, version: SEED_VERSION }); // done: no longer "resetting"
+  } finally {
+    await s.remove('LOCK', 'reset');
+  }
 }
 
+type SessionMeta = { seededOn?: string; version?: number; resetting?: boolean; since?: number };
+const readMeta = (s: Session) => s.get<SessionMeta>('META', 'session');
+
+/** Seeded, and not in the middle of being reset (a reset that has gone quiet for a minute is taken to have died). */
+const isReady = (m: SessionMeta | undefined): boolean => !!m && !(m.resetting && Date.now() - (m.since ?? 0) < RESET_STALE_MS);
+
 export async function isSeeded(s: Session): Promise<boolean> {
-  return !!(await s.get('META', 'session'));
+  return isReady(await readMeta(s));
 }
 
 /**
@@ -35,14 +63,19 @@ export async function isSeeded(s: Session): Promise<boolean> {
  * while the others wait for it to finish.
  */
 export async function ensureSeeded(s: Session): Promise<void> {
-  const meta = await s.get<{ seededOn?: string; version?: number }>('META', 'session');
+  const meta = await readMeta(s);
   if (meta) {
+    // Someone is resetting this session: wait for it to finish rather than see it half-empty
+    if (!isReady(meta)) {
+      for (let i = 0; i < 200 && !isReady(await readMeta(s)); i++) await sleep(50);
+      return;
+    }
     if ((meta.version ?? 1) < SEED_VERSION) await upgradeSession(s, meta.seededOn);
     return;
   }
   if (await s.putIfAbsent('LOCK', 'seed', { expires: Date.now() + 30_000 })) {
     try {
-      if (!(await isSeeded(s))) await resetSession(s.id);
+      if (!(await readMeta(s))) await resetSession(s.id); // (not if a reset has already begun: that one will finish the job)
     } finally {
       await s.remove('LOCK', 'seed');
     }

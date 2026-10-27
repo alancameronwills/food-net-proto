@@ -24,7 +24,7 @@ export function Overview({ orders, requests, boot }: { orders: Order[]; requests
     [t('metricFill'), ordered ? `${Math.round((got / ordered) * 100)}%` : '–'],
     [t('metricProducers'), new Set(live.map((o) => o.producerId)).size],
     [t('metricListings'), boot.listings.length],
-    [t('metricRequests'), requests.filter((r) => r.status === 'open').length],
+    ...(boot.config.demandOn ? [[t('metricRequests'), requests.filter((r) => r.status === 'open').length] as [string, string | number]] : []),
   ];
 
   return (
@@ -61,7 +61,7 @@ export function Overview({ orders, requests, boot }: { orders: Order[]; requests
           </div>
         )}
       </section>
-      {requests.length > 0 && (
+      {boot.config.demandOn && requests.length > 0 && (
         <section>
           <h2 className="mb-2 text-lg font-semibold text-brand-dark">{t('requestsHeading')}</h2>
           <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">

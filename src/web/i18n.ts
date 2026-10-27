@@ -122,6 +122,7 @@ const en = {
   shelfUsual: 'usual for this product', shelfLifeLabel: 'Shelf life (days)', shelfLifeHelp: 'How long it stays good after delivery. Leave blank for the usual for this kind of product.', shelfLifeShort: 'Good for {{time}}',
   movedLine: '{{name}} moved from {{from}} to {{to}}: the nearest day it can be delivered and still be good for {{use}}.', dismiss: 'Dismiss',
   lineNoDay: 'No delivery day works for {{date}}. Change “Needed on” in Browse, or remove this item.', invoiceSingle: 'One invoice from the producer', deliverySingle: 'One delivery',
+  demandSwitchTitle: 'Demand requests', demandSwitchHelp: 'Buyers asking for things nobody has listed yet, and producers bidding. Switch off to hide them from every screen (requests already made are kept, and reappear when switched back on).', demandOnLabel: 'On', demandOffLabel: 'Off', usesDemandNote: 'This scenario uses demand requests, so starting it switches them on.',
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
 };
 const cy: typeof en = {
@@ -243,6 +244,7 @@ const cy: typeof en = {
   shelfUsual: 'arferol ar gyfer y cynnyrch hwn', shelfLifeLabel: 'Oes silff (diwrnodau)', shelfLifeHelp: 'Pa mor hir y mae’n aros yn dda ar ôl ei ddosbarthu. Gadewch yn wag am y arferol ar gyfer y math hwn o gynnyrch.', shelfLifeShort: 'Da am {{time}}',
   movedLine: 'Symudwyd {{name}} o {{from}} i {{to}}: y diwrnod agosaf y gellir ei ddosbarthu a bod yn dda o hyd ar gyfer {{use}}.', dismiss: 'Cau',
   lineNoDay: 'Nid oes diwrnod dosbarthu yn gweithio ar gyfer {{date}}. Newidiwch “Ei angen ar” yn Pori, neu dilëwch yr eitem hon.', invoiceSingle: 'Un anfoneb gan y cynhyrchydd', deliverySingle: 'Un danfoniad',
+  demandSwitchTitle: 'Ceisiadau galw', demandSwitchHelp: 'Prynwyr yn gofyn am bethau nad oes neb wedi’u rhestru eto, a chynhyrchwyr yn cynnig. Diffoddwch i’w cuddio ar bob sgrin (mae ceisiadau sydd eisoes wedi’u gwneud yn cael eu cadw ac yn ailymddangos pan fyddwch yn eu hailgynnau).', demandOnLabel: 'Ymlaen', demandOffLabel: 'I ffwrdd', usesDemandNote: 'Mae’r senario hwn yn defnyddio ceisiadau galw, felly mae ei ddechrau yn eu hailgynnau.',
   units: { litre: 'litr', kg: 'kg', dozen: 'dwsin', loaf: 'torth', each: 'yr un', crate: 'cawell' },
 };
 

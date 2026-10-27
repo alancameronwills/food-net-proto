@@ -6,7 +6,7 @@ import type { Session } from './db';
 import { placeOrders } from './orders';
 import type { Result } from './producer';
 import { upsertWindow } from './producer';
-import { resetSession } from './store';
+import { getConfig, resetSession } from './store';
 
 const fail = (status: 400 | 403 | 404 | 409, error: string): Result<never> => ({ ok: false, status, error });
 
@@ -40,8 +40,11 @@ export async function startScenario(s: Session, actor: Organisation | undefined,
   if (!scenario) return fail(404, 'Unknown scenario');
   if (!scenario.available) return fail(409, scenario.unavailableReason?.en ?? 'This scenario is not available yet');
 
+  // A scenario starts from the standard settings, but it should not undo the operator's choice to keep demand requests
+  // off unless the scenario is about them, in which case they come back on
+  const demandWasOn = (await getConfig(s)).demandOn;
   await resetSession(s.id);
-  const finalConfig: ModelConfig = sanitiseConfig(scenario.config, DEFAULT_CONFIG);
+  const finalConfig: ModelConfig = { ...sanitiseConfig(scenario.config, DEFAULT_CONFIG), demandOn: scenario.usesDemand ? true : demandWasOn };
   const setup = SETUP[scenario.id];
   if (setup) {
     await s.put('CONFIG', 'model', { ...finalConfig, localRange: 'warn' });
