@@ -30,7 +30,7 @@ export function setPersona(id: string) {
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const send = () => fetch(`/api${path}`, {
     ...init,
     headers: {
       'content-type': 'application/json',
@@ -39,6 +39,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...init.headers,
     },
   });
+  let res = await send();
+  // A busy moment on a small AWS account can throttle a request (429/503) before it runs; reading again is safe
+  const reading = (init.method ?? 'GET') === 'GET';
+  for (let tries = 0; reading && [429, 502, 503, 504].includes(res.status) && tries < 2; tries++) {
+    await new Promise((r) => setTimeout(r, 300 * (tries + 1)));
+    res = await send();
+  }
   if (!res.ok) throw new Error((await res.json().catch(() => ({ error: res.statusText }))).error);
   return res.json();
 }

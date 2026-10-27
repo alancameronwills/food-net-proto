@@ -238,13 +238,17 @@ async function warmup(o: Options) {
   if (!out) throw new Error(`Nothing is deployed for stage "${o.stage}". Deploy first.`);
   say(`Waking ${out.SiteUrl} with ${o.concurrency} requests at a time, ${o.rounds} rounds (a request at the same moment gets its own copy of the API, so this prepares for about ${o.concurrency} people arriving together).\n`);
   for (let round = 1; round <= o.rounds; round++) {
+    // One request per worker, so "concurrency" is exactly how many copies of the API are woken at once
     const results = await Promise.all(Array.from({ length: o.concurrency }, async (_, i) => {
-      const [h, p] = await Promise.all([get(`${out.SiteUrl}/api/health`), get(`${out.SiteUrl}/api/personas`, { 'x-session': 'warmup' })]);
-      return { ok: h.status === 200 && p.status === 200, ms: Math.max(h.ms, p.ms), i };
+      const r = await get(`${out.SiteUrl}/api/personas`, { 'x-session': 'warmup' });
+      return { ok: r.status === 200, ms: r.ms, i, why: r.status === 200 ? '' : `HTTP ${r.status} ${r.text.slice(0, 80).replace(/\s+/g, ' ')}` };
     }));
     const ms = results.map((r) => r.ms).sort((a, b) => a - b);
     say(`  Round ${round}: ${results.filter((r) => r.ok).length}/${results.length} ok, fastest ${ms[0]} ms, median ${ms[Math.floor(ms.length / 2)]} ms, slowest ${ms[ms.length - 1]} ms`);
-    if (results.some((r) => !r.ok)) throw new Error('Some requests failed.');
+    if (results.some((r) => !r.ok)) {
+      const reasons = [...new Set(results.filter((r) => !r.ok).map((r) => r.why))];
+      throw new Error(`Some requests failed:\n  ${reasons.join('\n  ')}\n(429 or 5xx here usually means the account's Lambda concurrency limit is lower than ${o.concurrency}; check it with: aws lambda get-account-settings. Try a smaller --concurrency.)`);
+    }
     await new Promise((r) => setTimeout(r, 1500));
   }
   say('\nWarm. The copies stay ready for a few minutes of quiet; run this again shortly before the session if there is a long gap.');
