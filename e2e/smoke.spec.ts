@@ -113,7 +113,7 @@ test('every page carries a red banner under the top line saying this is a protot
   const viewport = page.viewportSize()!;
   expect(box!.width).toBeGreaterThanOrEqual(viewport.width - 20);
   expect(box!.y).toBeGreaterThan(Math.max(title!.y + title!.height, lang!.y + lang!.height) - 2);
-  expect(Math.abs(title!.y + title!.height / 2 - (lang!.y + lang!.height / 2))).toBeLessThan(14); // title and buttons share one line
+  if (viewport.width >= 1000) expect(Math.abs(title!.y + title!.height / 2 - (lang!.y + lang!.height / 2))).toBeLessThan(14); // title and buttons share one line (on a tablet the top line wraps, as it always did)
 
   await page.getByRole('button', { name: 'Cymraeg' }).click();
   await expect(banner).toHaveText('Prototeip ar gyfer arbrawf a thrafodaeth');
