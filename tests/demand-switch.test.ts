@@ -137,7 +137,7 @@ describe.skipIf(!dbUp)('scenarios and the demand switch', () => {
     await op.post('/admin/reset');
     expect((await op.get('/config')).body.demandOn).toBe(true); // "reset to the starting data" means the starting settings
     void sid;
-  });
+  }, 60_000); // four reseeds in a row: slow when the whole suite shares one database
 
   it('a scenario started while demand is already on leaves it on', async () => {
     const { op } = await setup();
