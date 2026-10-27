@@ -119,6 +119,8 @@ const en = {
   deliverOn: 'Deliver on', forUseOn: 'for use on {{date}}, good for {{time}}', lineNote: 'Note for the producer about', lineNotePlaceholder: 'Note for the producer about this item (optional)',
   deliveriesHubMany: '{{n}} consolidated deliveries, one per day',
   shelfUsual: 'usual for this product', shelfLifeLabel: 'Shelf life (days)', shelfLifeHelp: 'How long it stays good after delivery. Leave blank for the usual for this kind of product.', shelfLifeShort: 'Good for {{time}}',
+  movedLine: '{{name}} moved from {{from}} to {{to}}: the nearest day it can be delivered and still be good for {{use}}.', dismiss: 'Dismiss',
+  lineNoDay: 'No delivery day works for {{date}}. Change “Needed on” in Browse, or remove this item.', invoiceSingle: 'One invoice from the producer', deliverySingle: 'One delivery',
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
 };
 const cy: typeof en = {
@@ -237,6 +239,8 @@ const cy: typeof en = {
   deliverOn: 'Dosbarthu ar', forUseOn: 'i’w ddefnyddio ar {{date}}, da am {{time}}', lineNote: 'Nodyn i’r cynhyrchydd am', lineNotePlaceholder: 'Nodyn i’r cynhyrchydd am yr eitem hon (dewisol)',
   deliveriesHubMany: '{{n}} danfoniad cyfunol, un y diwrnod',
   shelfUsual: 'arferol ar gyfer y cynnyrch hwn', shelfLifeLabel: 'Oes silff (diwrnodau)', shelfLifeHelp: 'Pa mor hir y mae’n aros yn dda ar ôl ei ddosbarthu. Gadewch yn wag am y arferol ar gyfer y math hwn o gynnyrch.', shelfLifeShort: 'Da am {{time}}',
+  movedLine: 'Symudwyd {{name}} o {{from}} i {{to}}: y diwrnod agosaf y gellir ei ddosbarthu a bod yn dda o hyd ar gyfer {{use}}.', dismiss: 'Cau',
+  lineNoDay: 'Nid oes diwrnod dosbarthu yn gweithio ar gyfer {{date}}. Newidiwch “Ei angen ar” yn Pori, neu dilëwch yr eitem hon.', invoiceSingle: 'Un anfoneb gan y cynhyrchydd', deliverySingle: 'Un danfoniad',
   units: { litre: 'litr', kg: 'kg', dozen: 'dwsin', loaf: 'torth', each: 'yr un', crate: 'cawell' },
 };
 

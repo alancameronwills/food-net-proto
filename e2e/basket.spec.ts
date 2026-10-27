@@ -131,7 +131,7 @@ test.describe('a basket with a delivery day and a note for each item', () => {
     }
   });
 
-  test('a day that stops working while it is in the basket is flagged, and the item can be moved', async ({ browser, request }) => {
+  test('a day that stops working while it is in the basket is replaced by the nearest day that works, with a notice', async ({ browser, request }) => {
     const s = newSession();
     await setModel(request, s, { delivery: 'hub_courier', hubDays: [2, 4] }); // Tuesdays and Thursdays
     const buyer = await person(browser, buyerUrl(s));
@@ -139,20 +139,77 @@ test.describe('a basket with a delivery day and a note for each item', () => {
       await add(buyer.page, MILK, 10); // needed on a Thursday: delivered Thursday, or Tuesday
       const line = buyer.page.getByTestId(`cart-line-${MILK}`);
       await expect(line.getByTestId('line-date')).toHaveValue(THURSDAY);
-      await expect(buyer.page.getByTestId('cart').getByRole('button', { name: 'Place order' })).toBeEnabled();
+      await expect(buyer.page.getByTestId('moved-notice')).toHaveCount(0);
 
-      // The hub drops its Thursday round
+      // The hub drops its Thursday round: the item moves to the Tuesday round by itself, and says so
       await request.put('/api/config', { headers: as(s, 'operator'), data: { hubDays: [2] } });
-      await expect(line.getByRole('alert')).toContainText('Problem', { timeout: 10_000 });
-      await expect(buyer.page.getByTestId('cart').getByRole('button', { name: 'Place order' })).toBeDisabled();
-
-      // Moving it to the Tuesday round fixes it
-      await line.getByTestId('line-date').selectOption(addDays(THURSDAY, -2));
+      const tuesday = addDays(THURSDAY, -2);
+      await expect(line.getByTestId('line-date')).toHaveValue(tuesday, { timeout: 10_000 });
+      await expect(buyer.page.getByTestId('moved-notice')).toContainText(`Whole milk moved from ${dayLabel(THURSDAY)} to ${dayLabel(tuesday)}`);
       await expect(line.getByRole('alert')).toHaveCount(0);
       await expect(buyer.page.getByTestId('cart').getByRole('button', { name: 'Place order' })).toBeEnabled();
+      await buyer.page.getByTestId('moved-notice').getByRole('button', { name: 'Dismiss' }).click();
+      await expect(buyer.page.getByTestId('moved-notice')).toHaveCount(0);
     } finally {
       await buyer.close();
     }
+  });
+
+  test('a basket saved by the older version is repaired on opening, not left flagged', async ({ browser, request }) => {
+    const s = newSession();
+    await setModel(request, s);
+    const friday = nextWeekday(addDays(todayIso(), 4), [5]);
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    // The older basket had one date for everything: cheese (delivered Wednesdays) on a Friday was never going to work
+    await page.addInitScript(([session, date]) => {
+      localStorage.setItem(`cart:${session}:corner-deli`, JSON.stringify({ date, qty: { 'dyfed-dairy:cheese-cheddar': 2, 'dyfed-dairy:milk-whole': 10 } }));
+    }, [s, friday]);
+    try {
+      await page.goto(buyerUrl(s));
+      const cheese = page.getByTestId('cart-line-dyfed-dairy:cheese-cheddar');
+      const wednesday = addDays(friday, -2);
+      await expect(cheese.getByTestId('line-date')).toHaveValue(wednesday, { timeout: 10_000 });
+      await expect(page.getByTestId('moved-notice')).toContainText(`Welsh cheddar moved from ${dayLabel(friday)} to ${dayLabel(wednesday)}`);
+      await expect(page.getByTestId('cart').getByRole('alert')).toHaveCount(0);
+      await expect(page.getByTestId('cart').getByRole('button', { name: 'Place order' })).toBeEnabled();
+      await expect(page.getByTestId(`cart-line-${MILK}`).getByTestId('line-date')).toHaveValue(friday); // milk was fine where it was
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test('when no other day works, the item stays flagged with a clear way out', async ({ browser, request }) => {
+    const s = newSession();
+    await setModel(request, s, { delivery: 'hub_courier', hubDays: [2] }); // Tuesdays only
+    const friday = nextWeekday(addDays(todayIso(), 5), [5]);
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    // Milk keeps two days, and the last Tuesday before this Friday is three days earlier
+    await page.addInitScript(([session, date]) => {
+      localStorage.setItem(`cart:${session}:corner-deli`, JSON.stringify({ date, qty: { 'dyfed-dairy:milk-whole': 10 } }));
+    }, [s, friday]);
+    try {
+      await page.goto(buyerUrl(s));
+      const line = page.getByTestId(`cart-line-${MILK}`);
+      await expect(line.getByRole('alert')).toContainText('No delivery day works for');
+      await expect(line.getByRole('alert')).toContainText('Change “Needed on” in Browse');
+      await expect(page.getByTestId('moved-notice')).toHaveCount(0); // nothing to move it to
+      await expect(page.getByTestId('cart').getByRole('button', { name: 'Place order' })).toBeDisabled();
+      await line.getByRole('button', { name: 'Remove' }).click();
+      await expect(page.getByTestId('cart')).toContainText('Your basket is empty');
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  test('one producer on one day reads as one invoice and one delivery', async ({ page, request }) => {
+    const s = newSession();
+    await setModel(request, s);
+    await page.goto(buyerUrl(s));
+    await add(page, MILK, 10);
+    await expect(page.getByTestId('cart')).toContainText('One invoice from the producer');
+    await expect(page.getByTestId('cart-deliveries')).toHaveText('One delivery');
   });
 });
 

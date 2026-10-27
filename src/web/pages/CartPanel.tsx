@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { addDays as addDaysTo, todayIso } from '../../shared/dates';
 import { deliverableDates, shelfLifeFor } from '../../shared/availability';
@@ -11,6 +11,9 @@ import { api, type Bootstrap } from '../api';
 import type { CartLine } from '../cart';
 import { duration, shortDate } from '../format';
 import { loc } from '../i18n';
+
+// Problems with the day itself (as opposed to stock): there may be another day that works, so the basket moves the item
+const DAY_PROBLEMS = ['not_delivery_day', 'not_route_day', 'not_hub_day', 'no_route', 'too_soon', 'too_far'];
 
 type Result = { orders: Order[]; failed: { producerId: string; deliveryDate: string; error: string }[] };
 
@@ -42,9 +45,25 @@ export function CartPanel({ buyerId, boot, windows, lines: cartLines, setQty, se
     const options = days.filter((d) => d.date <= c.useOn && d.date >= addDaysTo(c.useOn, -shelf)).map((d) => d.date);
     const av = availabilityFor({ config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(c.listingId, c.deliveryDate)), date: c.deliveryDate, today, driveKm: o.driveKm, rule: o.rule });
     const unit = unitPriceFor(boot.config, o.listing, c.qty);
-    const problem = av.problem ? t(`why_${av.problem}`) : c.qty > av.orderable ? t('onlyN', { n: av.orderable }) : c.qty < o.listing.minOrder ? t('minShort', { n: o.listing.minOrder }) : '';
-    return [{ c, o, shelf, options: options.includes(c.deliveryDate) ? options : [c.deliveryDate, ...options].sort(), unit, problem, total: lineTotal(unit, c.qty) }];
+    const dayProblemNoAlt = !!av.problem && DAY_PROBLEMS.includes(av.problem) && options.length === 0;
+    const problem = dayProblemNoAlt ? t('lineNoDay', { date: shortDate(c.useOn, i18n.language) }) : av.problem ? t(`why_${av.problem}`) : c.qty > av.orderable ? t('onlyN', { n: av.orderable }) : c.qty < o.listing.minOrder ? t('minShort', { n: o.listing.minOrder }) : '';
+    // The delivery day itself has stopped working (a changed round, an old basket): the nearest day that does is available
+    const dayProblem = !!av.problem && DAY_PROBLEMS.includes(av.problem);
+    const moveTo = dayProblem && options.length > 0 ? options[options.length - 1] : undefined;
+    return [{ c, o, shelf, options: options.includes(c.deliveryDate) ? options : [c.deliveryDate, ...options].sort(), unit, problem, moveTo, total: lineTotal(unit, c.qty) }];
   });
+  // Move any item whose delivery day no longer works, and say so
+  const [moved, setMoved] = useState<{ id: string; name: string; from: string; to: string; useOn: string }[]>([]);
+  const toMove = lines.filter((l) => l.moveTo).map((l) => `${l.c.key}>${l.moveTo}`).join(',');
+  useEffect(() => {
+    const done: typeof moved = [];
+    for (const l of lines) {
+      if (!l.moveTo) continue;
+      setDeliveryDate(l.c.key, l.moveTo);
+      done.push({ id: l.c.key, name: loc(l.o.product.name), from: l.c.deliveryDate, to: l.moveTo, useOn: l.c.useOn });
+    }
+    if (done.length) setMoved((m) => [...m, ...done]);
+  }, [toMove]); // eslint-disable-line react-hooks/exhaustive-deps
   const producers = [...new Set(lines.map((l) => l.o.producer.id))];
   const orderKeys = new Set(lines.map((l) => `${l.o.producer.id}|${l.c.deliveryDate}`));
   const days = new Set(lines.map((l) => l.c.deliveryDate));
@@ -78,6 +97,14 @@ export function CartPanel({ buyerId, boot, windows, lines: cartLines, setQty, se
   return (
     <aside data-testid="cart" className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4">
       <h2 className="text-lg font-bold text-brand">{t('cart')}</h2>
+      {moved.length > 0 && (
+        <div role="status" data-testid="moved-notice" className="mt-2 rounded bg-sky-50 p-2 text-sm text-sky-900">
+          <ul className="list-disc pl-5">
+            {moved.map((m) => <li key={m.id + m.from}>{t('movedLine', { name: m.name, from: shortDate(m.from, i18n.language), to: shortDate(m.to, i18n.language), use: shortDate(m.useOn, i18n.language) })}</li>)}
+          </ul>
+          <button className="mt-1 text-xs underline" onClick={() => setMoved([])}>{t('dismiss')}</button>
+        </div>
+      )}
       {placed && placed.failed.length > 0 && (
         <div role="alert" className="mt-2 rounded bg-red-100 p-2 text-sm text-red-800">
           <b>{t('someFailed')}</b> {t('basketKept')}
@@ -117,10 +144,10 @@ export function CartPanel({ buyerId, boot, windows, lines: cartLines, setQty, se
           </div>
           <div className="mt-3 flex justify-between border-t-2 border-gold pt-2 text-lg font-bold"><span>{t('total')}</span><span data-testid="cart-total">£{total.toFixed(2)}</span></div>
           <ul className="mt-1 text-xs text-slate-600">
-            <li>{caps.consolidatedInvoice ? t('invoiceOne') : t('invoicesSeparate', { n: producers.length })}</li>
+            <li>{caps.consolidatedInvoice ? t('invoiceOne') : producers.length === 1 ? t('invoiceSingle') : t('invoicesSeparate', { n: producers.length })}</li>
             <li data-testid="cart-deliveries">{caps.consolidatedDelivery
               ? (days.size === 1 ? t('deliveryOne') : t('deliveriesHubMany', { n: days.size }))
-              : t('deliveriesSeparate', { n: orderKeys.size })}</li>
+              : orderKeys.size === 1 ? t('deliverySingle') : t('deliveriesSeparate', { n: orderKeys.size })}</li>
             <li data-testid="cart-delivery-mode">{t(`deliveryModeNote_${boot.config.delivery}`, { days: dayNames(boot.config.hubDays, i18n.language === 'cy' ? 'cy' : 'en') })}</li>
           </ul>
           {error && <p role="alert" className="mt-2 rounded bg-red-100 p-2 text-sm text-red-800">{error}</p>}
