@@ -52,9 +52,8 @@ export function usePolled<T>(path: string, ms = 3000) {
   );
   useEffect(() => {
     void load();
-    // A tab in the background polls a quarter as often: still catches up, but costs less
-    let tick = 0;
-    const t = setInterval(() => { if (!document.hidden || ++tick % 4 === 0) void load(); }, ms);
+    // Keeps polling in a background tab too: someone watching a shared screen on another window must not see stale data
+    const t = setInterval(() => void load(), ms);
     return () => clearInterval(t);
   }, [load, ms]);
   return { data, error, reload: load };

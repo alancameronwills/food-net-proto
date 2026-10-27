@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DIMENSIONS, PRESETS, presetConfig, type ModelConfig } from '../../shared/models';
 import type { Persona } from '../../shared/types';
@@ -12,11 +12,27 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
   const c = boot.config;
   // Hub days toggled in quick succession each build on the last click, not on a stale copy from the server
   const [hubLocal, setHubLocal] = useState<number[]>();
+  // Changes go to the server one after another, so quick clicks cannot arrive out of order and undo each other
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const hubDays = hubLocal ?? c.hubDays;
+  // Keep the operator's latest choice until the server's copy has caught up with it. Dropping back to the server's
+  // copy as soon as a save finishes would build the next click on a stale list and undo the previous one.
+  const sameDays = (a: number[], b: number[]) => [...a].sort().join() === [...b].sort().join();
+  useEffect(() => { if (hubLocal && sameDays(hubLocal, c.hubDays)) setHubLocal(undefined); }, [c.hubDays, hubLocal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const change = async (patch: Partial<ModelConfig>) => {
-    await api('/config', { method: 'PUT', body: JSON.stringify(patch) });
+  const [error, setError] = useState('');
+  // A switch that did not save must say so, not quietly flick back
+  const change = async (patch: Partial<ModelConfig>): Promise<boolean> => {
+    let ok = true;
+    try {
+      setError('');
+      await api('/config', { method: 'PUT', body: JSON.stringify(patch) });
+    } catch (e) {
+      ok = false;
+      setError((e as Error).message);
+    }
     reload();
+    return ok;
   };
   const link = (id: string) => `${location.origin}/home?s=${ctx.session}&as=${id}`;
   const copy = async (id: string) => {
@@ -31,6 +47,8 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
         <h1 className="text-2xl font-bold text-brand">{t('modelLab')}</h1>
         <p className="text-slate-600">{t('modelLabIntro')}</p>
       </div>
+
+      {error && <p role="alert" data-testid="lab-error" className="rounded bg-red-100 p-2 text-sm text-red-800">{error}</p>}
 
       <section data-testid="presets">
         <h2 className="text-lg font-semibold text-brand-dark">{t('presetsTitle')}</h2>
@@ -78,7 +96,7 @@ export function ModelLab({ boot, personas, reload }: { boot: Bootstrap; personas
                           const next = on ? hubDays.filter((x) => x !== day) : [...hubDays, day];
                           if (next.length === 0) return; // the hub must run on at least one day
                           setHubLocal(next);
-                          void change({ hubDays: next }).then(() => setHubLocal(undefined));
+                          queue.current = queue.current.then(() => change({ hubDays: next })).then((ok) => { if (!ok) setHubLocal(undefined); });
                         }}
                           className={`rounded border px-2 py-0.5 ${on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white'}`}>{WEEKDAYS.en[day]}</button>
                       );

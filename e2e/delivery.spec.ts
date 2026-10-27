@@ -112,10 +112,13 @@ test.describe('delivery model: area days', () => {
 
 test.describe('delivery model: hub courier', () => {
   test('only hub days count, and the operator controls them', async ({ browser, request }) => {
+    test.slow(); // three screens refresh one after another; allow for a busy machine
     const s = newSession();
     await setModel(request, s, { delivery: 'hub_courier', hubDays: [2, 4, 6] });
     const buyer = await person(browser, buyerUrl(s));
     const op = await person(browser, `/lab?s=${s}&as=operator`);
+    const slow = { timeout: 30_000 };
+    const hubDaysOnServer = async () => ((await (await request.get('/api/config', { headers: as(s, 'operator') })).json()) as { hubDays: number[] }).hubDays;
     try {
       await expect(buyer.page.getByTestId('hub-info')).toContainText('Tue, Thu, Sat');
       const milk = buyer.page.getByTestId(`offer-${MILK}`);
@@ -125,15 +128,16 @@ test.describe('delivery model: hub courier', () => {
 
       // The operator cuts the round to Tuesdays only: milk is good for two days, so Friday no longer works
       for (const day of ['Thu', 'Sat']) await op.page.getByTestId('hub-days').getByRole('button', { name: day }).click();
-      await expect(buyer.page.getByTestId('hub-info')).toContainText('Tue', { timeout: 10_000 });
-      await expect(buyer.page.getByTestId('hub-info')).not.toContainText('Thu');
-      await expect(milk).toHaveAttribute('data-available', 'false', { timeout: 10_000 });
+      await expect.poll(hubDaysOnServer, slow).toEqual([2]); // saved, in order, whatever the clicks' timing
+      await expect(buyer.page.getByTestId('hub-info')).toHaveText(/Tue \(/, slow);
+      await expect(milk).toHaveAttribute('data-available', 'false', slow);
       await expect(milk.getByTestId('why-not')).toContainText('Not available for');
 
       // ...until Fridays are added
       await op.page.getByTestId('hub-days').getByRole('button', { name: 'Fri' }).click();
-      await expect(buyer.page.getByTestId('hub-info')).toContainText('Tue, Fri', { timeout: 10_000 });
-      await expect(milk).toHaveAttribute('data-available', 'true', { timeout: 10_000 });
+      await expect.poll(hubDaysOnServer, slow).toEqual([2, 5]);
+      await expect(buyer.page.getByTestId('hub-info')).toContainText('Tue, Fri', slow);
+      await expect(milk).toHaveAttribute('data-available', 'true', slow);
       await expect(milk.getByTestId('delivered-on')).toContainText('Fri');
     } finally {
       await buyer.close();

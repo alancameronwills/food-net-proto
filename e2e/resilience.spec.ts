@@ -38,3 +38,41 @@ test.describe('when something goes wrong', () => {
     await expect(page.getByTestId('hub-days')).toHaveCount(0);
   });
 });
+
+test('a model switch that fails to save says so', async ({ page }) => {
+  const s = newSession();
+  await page.goto(`/lab?s=${s}&as=operator`);
+  await expect(page.getByTestId('presets')).toBeVisible();
+  await page.route('**/api/config', async (route) => {
+    if (route.request().method() === 'PUT') await route.fulfill({ status: 500, json: { error: 'The database is busy' } });
+    else await route.continue();
+  });
+  await page.getByRole('button', { name: 'Hub courier' }).first().click();
+  await expect(page.getByTestId('lab-error')).toContainText('The database is busy');
+  await page.unroute('**/api/config');
+  await page.getByRole('button', { name: 'Hub courier' }).first().click();
+  await expect(page.getByTestId('lab-error')).toHaveCount(0);
+  await expect(page.getByTestId('hub-days')).toBeVisible();
+});
+
+test('two quick hub-day clicks both stick, even when the screen is slow to refresh', async ({ page, request }) => {
+  const s = newSession();
+  const headers = { 'x-session': s, 'x-persona': 'operator' };
+  await request.put('/api/config', { headers, data: { delivery: 'hub_courier', hubDays: [2, 4, 6] } });
+  // Make the screen's copy of the settings slow to catch up, which is when a second click used to build on stale data
+  await page.route('**/api/bootstrap', async (route) => {
+    await new Promise((r) => setTimeout(r, 2500));
+    try { await route.continue(); } catch { /* test over */ }
+  });
+  await page.goto(`/lab?s=${s}&as=operator`);
+  const days = page.getByTestId('hub-days');
+  await expect(days).toBeVisible({ timeout: 20_000 });
+  const saved = page.waitForResponse((r) => r.url().includes('/api/config') && r.request().method() === 'PUT');
+  await days.getByRole('button', { name: 'Thu' }).click();
+  await saved; // the first change is saved, but the screen has not yet refreshed
+  await days.getByRole('button', { name: 'Sat' }).click();
+  await expect.poll(async () => ((await (await request.get('/api/config', { headers })).json()) as { hubDays: number[] }).hubDays, { timeout: 20_000 }).toEqual([2]);
+  await expect(days.getByRole('button', { name: 'Tue' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(days.getByRole('button', { name: 'Thu' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(days.getByRole('button', { name: 'Sat' })).toHaveAttribute('aria-pressed', 'false');
+});

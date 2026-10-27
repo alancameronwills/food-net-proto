@@ -6,6 +6,7 @@ export default defineConfig({
   fullyParallel: true,
   expect: { timeout: 10_000 }, // the suite runs many browsers at once; give polled screens room
   retries: 0,
+  workers: 4, // more than this overloads the in-memory test database and makes polled screens flaky
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:5173',
