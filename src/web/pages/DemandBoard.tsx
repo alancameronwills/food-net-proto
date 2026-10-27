@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { addDays, todayIso } from '../../shared/dates';
 import { useTranslation } from 'react-i18next';
 import type { Bid, RequestView } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
+import { bidFit, isSpecialDelivery } from '../delivery-info';
+import { duration, shortDate } from '../format';
 import { loc } from '../i18n';
 import { longDate } from './Browse';
 
@@ -65,6 +68,11 @@ function RequestCard({ r, boot, producerId, model, run, lang }: {
   const [qtyEdit, setQty] = useState<string>();
   const qty = qtyEdit ?? String(mine?.qty ?? capacity);
   const [note, setNote] = useState(mine?.note ?? '');
+  // The day offered: the day asked for unless the producer changes it (left alone, so pooled requests keep their own days)
+  const [dayEdit, setDay] = useState<string>();
+  const offeredDay = dayEdit ?? mine?.deliveryDate ?? r.deliveryDate;
+  const special = isSpecialDelivery(boot, r.productId, producerId, r.buyerId, offeredDay);
+  const { fit, shelf } = bidFit(boot, r.productId, producerId, r.deliveryDate, offeredDay);
   const [editing, setEditing] = useState(false);
 
   return (
@@ -84,27 +92,35 @@ function RequestCard({ r, boot, producerId, model, run, lang }: {
       {model === 'first_accept' ? (
         r.targetPrice !== undefined && (
           <button className="mt-3 rounded bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800"
-            onClick={() => run(() => api(`/requests/${r.id}/take`, { method: 'POST' }))}>{t('takeIt', { price: r.targetPrice.toFixed(2), qty: r.qty })}</button>
+            onClick={() => run(() => api(`/requests/${r.id}/take`, { method: 'POST' }))}>{t('takeIt', { price: r.targetPrice.toFixed(2), qty: r.qty })}{isSpecialDelivery(boot, r.productId, producerId, r.buyerId, r.deliveryDate) ? ` (${t('specialDelivery').toLowerCase()})` : ''}</button>
         )
       ) : (
         <>
           <p className="mt-2 text-xs text-slate-500">{t('bidsSoFar', { n: r.bidCount })}</p>
           {mine && !editing ? (
             <div className="mt-2 flex flex-wrap items-center gap-3 rounded bg-gold-light p-2 text-sm" data-testid="my-bid">
-              <b>{t('yourBid')}:</b> £{mine.price.toFixed(2)} × {mine.qty}
+              <b>{t('yourBid')}:</b> £{mine.price.toFixed(2)} × {mine.qty}{mine.deliveryDate && <span data-testid="my-bid-day"> · {t('bidDelivers', { date: shortDate(mine.deliveryDate, lang) })}</span>}
               <button className="underline" onClick={() => setEditing(true)}>{t('updateBid')}</button>
               <button className="text-red-700 underline" onClick={() => run(() => api(`/requests/${r.id}/bids/${mine.id}/withdraw`, { method: 'POST' }))}>{t('withdrawBid')}</button>
             </div>
           ) : (
             <form className="mt-3 flex flex-wrap items-end gap-3 text-sm" onSubmit={async (e) => {
               e.preventDefault();
-              if (await run(() => api(`/requests/${r.id}/bids`, { method: 'POST', body: JSON.stringify({ price: Number(price), qty: Number(qty), note: note.trim() || undefined }) }))) setEditing(false);
+              if (await run(() => api(`/requests/${r.id}/bids`, { method: 'POST', body: JSON.stringify({ price: Number(price), qty: Number(qty), note: note.trim() || undefined, deliveryDate: dayEdit }) }))) setEditing(false);
             }}>
               <label>{t('bidPriceLabel')}<input required type="number" min={0.01} step={0.01} value={price} onChange={(e) => setPrice(e.target.value)} className={`${input} ml-2 w-24`} /></label>
               <label>{t('bidQtyLabel')}<input required type="number" min={1} max={capacity} step={1} value={qty} onChange={(e) => setQty(e.target.value)} className={`${input} ml-2 w-24`} /></label>
+              <label>{t('bidDayLabel')}<input type="date" min={addDays(todayIso(), 1)} value={offeredDay} aria-label={t('bidDayLabel')} data-testid="bid-day"
+                onChange={(e) => setDay(e.target.value || undefined)} className={`${input} ml-2`} /></label>
               <label className="min-w-48 flex-1">{t('bidNoteLabel')}<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} className={`${input} ml-2 w-full`} /></label>
               <button className="rounded bg-brand px-4 py-1.5 font-semibold text-white hover:bg-brand-dark">{mine ? t('updateBid') : t('placeBid')}</button>
               {editing && <button type="button" className="underline" onClick={() => setEditing(false)}>{t('cancel')}</button>}
+              {(special || fit !== 'on_day') && (
+                <p data-testid="bid-day-note" className="basis-full rounded bg-sky-50 p-2 text-xs text-sky-900">
+                  {special && <span>{t('bidSpecialNote')} </span>}
+                  {fit !== 'on_day' && <span>{t(`bidFit_${fit}`, { time: duration(t, shelf), needed: shortDate(r.deliveryDate, lang) })}</span>}
+                </p>
+              )}
               {model === 'pooled' && r.pool && <p className="basis-full text-xs text-slate-600">{t('poolBidNote', { n: r.pool.requests })}</p>}
             </form>
           )}

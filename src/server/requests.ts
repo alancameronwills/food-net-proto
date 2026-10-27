@@ -1,8 +1,6 @@
 import { addDays, isIsoDate, mondayOf, todayIso } from '../shared/dates';
 import { localStatus } from '../shared/models';
-import { deliveryRule, ruleProblem, type DeliveryProblem } from '../shared/delivery';
-import { deliveryProblem } from '../shared/orders';
-import { listOrgs } from './store';
+import { MAX_DAYS_AHEAD, deliveryRule, isUsualDay } from '../shared/delivery';
 import type { Bid, Category, DemandRequest, Listing, Order, Organisation, RequestView, SupplyWindow } from '../shared/types';
 import type { Session, TxItem } from './db';
 import { emit, type EventParams, type EventType } from './events';
@@ -35,16 +33,6 @@ function inRange(ctx: Ctx, buyerId: string, producerId: string, category: Catego
 const remaining = (r: DemandRequest) => r.qty - r.filledQty;
 const OFF = 'Demand requests are switched off. The network operator can switch them on in the Model Lab.';
 
-function requestProblemText(problem: DeliveryProblem, product: string, lead: number): string {
-  switch (problem) {
-    case 'too_soon': return `Producers need at least ${lead} day(s) notice for ${product}`;
-    case 'too_far': return 'That date is too far ahead';
-    case 'not_hub_day': return 'The hub courier does not deliver on that day';
-    case 'not_route_day': return 'This producer does not deliver to that buyer\'s area on that day';
-    case 'no_route': return 'This producer does not deliver to that buyer\'s area';
-    default: return `${product} is not delivered on that day`;
-  }
-}
 const poolKey = (r: Pick<DemandRequest, 'productId' | 'deliveryDate'>) => `${r.productId}#${mondayOf(r.deliveryDate)}`;
 
 async function say(s: Session, type: EventType, r: DemandRequest, extra: EventParams, to: string[]) {
@@ -104,10 +92,10 @@ export async function createRequest(s: Session, actor: Organisation | undefined,
   if (!product || !category) return fail(400, 'Unknown product');
   if (!isQty(body.qty)) return fail(400, 'qty must be a whole number of at least 1');
   if (!isIsoDate(body.deliveryDate)) return fail(400, 'deliveryDate required (YYYY-MM-DD)');
-  // The date must at least be deliverable in principle: the hub courier's days under the hub model, else the product's usual days.
-  const rule = ctx.config.delivery === 'hub_courier' ? deliveryRule(ctx.config, category) : undefined;
-  const problem = rule ? ruleProblem(rule, body.deliveryDate, todayIso()) : deliveryProblem(category, { leadDays: undefined } as Listing, body.deliveryDate, todayIso());
-  if (problem) return fail(400, requestProblemText(problem, product.name.en, rule?.lead ?? category.leadDays));
+  // Any day from tomorrow is fine, even one the product is not normally delivered on, or at short notice: producers can
+  // answer with a different date, or a special delivery (the screens say so)
+  if (body.deliveryDate <= todayIso()) return fail(400, 'Choose tomorrow or a later day');
+  if (body.deliveryDate > addDays(todayIso(), MAX_DAYS_AHEAD)) return fail(400, 'That date is too far ahead');
   if (body.targetPrice !== undefined && body.targetPrice !== null && !isMoney(body.targetPrice)) return fail(400, 'targetPrice must be a positive number');
   const targetPrice = body.targetPrice ?? undefined;
   if (ctx.config.speculative === 'first_accept' && targetPrice === undefined) return fail(400, 'First-to-accept requests need a price you will pay');
@@ -147,7 +135,7 @@ export async function closeRequest(s: Session, actor: Organisation | undefined, 
 
 // ---- bidding -----------------------------------------------------------------------------------
 
-type BidBody = { price?: unknown; qty?: unknown; note?: unknown };
+type BidBody = { price?: unknown; qty?: unknown; note?: unknown; deliveryDate?: unknown };
 
 /**
  * A producer bids on a request. Under pooled demand a single bid (a total capacity and a price) is spread
@@ -161,6 +149,14 @@ export async function placeBid(s: Session, actor: Organisation | undefined, id: 
   if (!isMoney(body.price)) return fail(400, 'price must be a positive number');
   if (!isQty(body.qty)) return fail(400, 'qty must be a whole number of at least 1');
   const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 300) : undefined;
+  // The producer may offer a different delivery day from the one asked for: earlier (if it keeps), later, or a special delivery
+  let deliveryDate: string | undefined;
+  if (body.deliveryDate !== undefined && body.deliveryDate !== null && body.deliveryDate !== '') {
+    if (!isIsoDate(body.deliveryDate)) return fail(400, 'deliveryDate must be YYYY-MM-DD');
+    if (body.deliveryDate <= todayIso()) return fail(400, 'Delivery must be tomorrow or later');
+    if (body.deliveryDate > addDays(todayIso(), MAX_DAYS_AHEAD)) return fail(400, 'That delivery date is too far ahead');
+    deliveryDate = body.deliveryDate;
+  }
 
   const first = await s.get<DemandRequest>('REQUEST', id);
   if (!first) return fail(404, 'No such request');
@@ -168,19 +164,11 @@ export async function placeBid(s: Session, actor: Organisation | undefined, id: 
   const category = ctx.categories.get(product.category)!;
   if (first.status !== 'open') return fail(409, `This request is already ${first.status}`);
   if (!inRange(ctx, first.buyerId, actor.id, category)) return fail(403, 'This buyer is outside your local range');
-  const orgs = new Map((await listOrgs(s)).map((o) => [o.id, o]));
-  const canDeliver = (r: DemandRequest) => {
-    const rule = deliveryRule(ctx.config, category, undefined, actor, orgs.get(r.buyerId)?.area);
-    return ruleProblem(rule, r.deliveryDate, todayIso());
-  };
-  const blocked = canDeliver(first);
-  if (blocked) return fail(400, requestProblemText(blocked, product.name.en, category.leadDays));
-
   // Which requests does this bid apply to?
   let targets = [first];
   if (ctx.config.speculative === 'pooled') {
     targets = (await s.list<DemandRequest>('REQUEST'))
-      .filter((r) => r.status === 'open' && poolKey(r) === poolKey(first) && inRange(ctx, r.buyerId, actor.id, category) && !canDeliver(r))
+      .filter((r) => r.status === 'open' && poolKey(r) === poolKey(first) && inRange(ctx, r.buyerId, actor.id, category))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   } else if (body.qty > remaining(first)) {
     return fail(400, `You can offer at most ${remaining(first)} (what is still wanted)`);
@@ -191,7 +179,7 @@ export async function placeBid(s: Session, actor: Organisation | undefined, id: 
   for (const t of targets) {
     const give = Math.min(capacity, remaining(t));
     if (give <= 0) continue;
-    const bid = await upsertBid(s, t.id, actor.id, { price: body.price as number, qty: give, note });
+    const bid = await upsertBid(s, t.id, actor.id, { price: body.price as number, qty: give, note, deliveryDate });
     if (!bid) continue;
     capacity -= give;
     placed.push(bid);
@@ -203,11 +191,11 @@ export async function placeBid(s: Session, actor: Organisation | undefined, id: 
 }
 
 /** Add this producer's bid to a request, replacing any earlier open bid from them. */
-async function upsertBid(s: Session, requestId: string, producerId: string, v: { price: number; qty: number; note?: string }): Promise<Bid | undefined> {
+async function upsertBid(s: Session, requestId: string, producerId: string, v: { price: number; qty: number; note?: string; deliveryDate?: string }): Promise<Bid | undefined> {
   for (let attempt = 0; attempt < RETRIES; attempt++) {
     const r = await s.get<DemandRequest>('REQUEST', requestId);
     if (!r || r.status !== 'open') return undefined;
-    const bid: Bid = { id: `b-${Date.now().toString(36)}${rand()}`, producerId, price: v.price, qty: Math.min(v.qty, remaining(r)), note: v.note, createdAt: new Date().toISOString(), status: 'open' };
+    const bid: Bid = { id: `b-${Date.now().toString(36)}${rand()}`, producerId, price: v.price, qty: Math.min(v.qty, remaining(r)), note: v.note, ...(v.deliveryDate ? { deliveryDate: v.deliveryDate } : {}), createdAt: new Date().toISOString(), status: 'open' };
     const bids = [...r.bids.filter((b) => !(b.producerId === producerId && b.status === 'open')), bid];
     const tx = await s.transact([s.tPut('REQUEST', requestId, { ...r, bids, version: r.version + 1 }, '#v = :v', { '#v': 'version' }, { ':v': r.version })]);
     if (tx.ok) return bid;
@@ -255,7 +243,15 @@ async function fulfil(
     const listing: Listing = { id: listingId, producerId, productId: r.productId, pricePerUnit: bid.price, minOrder: 1, certifications: [] };
     await s.create('LISTING', listingId, listing); // harmless if they already sell it
 
-    const monday = mondayOf(r.deliveryDate);
+    // Delivered on the day the bid offered (else the day asked for). If that is not one of the producer's usual days
+    // for this buyer, it is a special delivery
+    const deliveryDate = bid.deliveryDate ?? r.deliveryDate;
+    const category = ctx.categories.get(ctx.products.get(r.productId)!.category)!;
+    const producerOrg = await s.get<Organisation>('ORG', producerId);
+    const buyerOrg = await s.get<Organisation>('ORG', r.buyerId);
+    const special = !isUsualDay(deliveryRule(ctx.config, category, undefined, producerOrg, buyerOrg?.area), deliveryDate);
+
+    const monday = mondayOf(deliveryDate);
     const winSk = `${listingId}#${monday}`;
     const existing = await s.get<SupplyWindow>('WINDOW', winSk);
     const windowOp: TxItem = existing
@@ -264,8 +260,8 @@ async function fulfil(
 
     const at = new Date().toISOString();
     const order: Order = {
-      id: `BL-${1000 + seq}`, groupId: `g-${requestId}-${bid.id}`, buyerId: r.buyerId, producerId, deliveryDate: r.deliveryDate,
-      status: 'confirmed', stock: 'reserved', deliveryMode: ctx.config.delivery as Order['deliveryMode'], lines: [{ listingId, productId: r.productId, qty, unitPrice: bid.price, ...(r.note ? { note: r.note } : {}) }],
+      id: `BL-${1000 + seq}`, groupId: `g-${requestId}-${bid.id}`, buyerId: r.buyerId, producerId, deliveryDate,
+      ...(special ? { special: true } : {}), status: 'confirmed', stock: 'reserved', deliveryMode: ctx.config.delivery as Order['deliveryMode'], lines: [{ listingId, productId: r.productId, qty, unitPrice: bid.price, ...(r.note ? { note: r.note } : {}) }],
       total: Math.round(qty * bid.price * 100) / 100, source: { requestId, bidId: bid.id }, createdAt: at,
       history: [{ at, status: 'confirmed', by }],
     };

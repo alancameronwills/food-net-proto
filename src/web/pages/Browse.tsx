@@ -126,6 +126,7 @@ export function Browse({ buyerId, boot, windows, useOn, onUseOn, qtyInCart, onAd
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span data-testid="stock-flag" className={`rounded border px-2 py-0.5 text-xs font-semibold ${CONF_STYLE[best.confidence]}`}>✓ {t(`conf_${best.confidence}`)}</span>
                     <span data-testid="delivered-on">{t('deliveredOn', { date: shortDate(best.date, i18n.language) })}</span>
+                    {best.special && <span data-testid="special-tag" className="rounded bg-sky-100 px-1.5 text-xs text-sky-900">{t('specialDelivery')}</span>}
                     <span className="text-xs text-slate-600">{t('nAvailable', { n: best.orderable })}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3">

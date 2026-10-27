@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { offersFor } from '../../shared/browse';
 import { addDays, todayIso } from '../../shared/dates';
 import { availableForUse, deliverableDates, shelfLifeFor } from '../../shared/availability';
+import { bidFit, isSpecialDelivery, requestDateNote } from '../delivery-info';
+import { duration, shortDate } from '../format';
 import { nextWeekday } from '../../shared/orders';
 import type { RequestView, SupplyWindow } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
@@ -29,6 +31,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
   const [busy, setBusy] = useState(false);
   const model = boot.config.speculative;
   const product = boot.products.find((p) => p.id === productId);
+  const dateNote = product ? requestDateNote(boot, product.id, date) : undefined;
 
   const run = async (f: () => Promise<unknown>) => {
     try { setError(''); await f(); reload(); return true; } catch (e) { setError((e as Error).message); return false; }
@@ -85,6 +88,11 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
         <label className="block text-sm font-medium">{t('reqNote')}
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={300} className={`${input} mt-1 w-full`} />
         </label>
+        {dateNote && (
+          <p data-testid="date-note" className="rounded bg-sky-50 p-2 text-sm text-sky-900">
+            {t(dateNote.kind === 'short' ? 'dateNoteShort' : 'dateNoteUnusual', { product: product ? loc(product.name) : '', date: shortDate(date, i18n.language), n: dateNote.days })}
+          </p>
+        )}
         {already > 0 && (
           <p data-testid="already-available" className="rounded bg-emerald-50 p-2 text-sm text-emerald-900">
             {t('reqAlready', { n: already })}{' '}
@@ -112,6 +120,9 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                   {r.targetPrice !== undefined && <span className="text-sm text-slate-600">£{r.targetPrice.toFixed(2)} / {t(`units.${p.unit}`)}</span>}
                   {r.filledQty > 0 && <span className="text-sm text-emerald-800">{t('reqFilled', { filled: r.filledQty, qty: r.qty })}</span>}
                 </div>
+                {requestDateNote(boot, r.productId, r.deliveryDate) && r.status === 'open' && (
+                  <p data-testid="request-date-note" className="mt-1 text-xs text-sky-900">{t('requestOffersDifferent')}</p>
+                )}
                 {r.pool && <p data-testid="pool-note" className="mt-1 rounded bg-brand-light px-2 py-1 text-sm text-brand">{t('pooledWith', { qty: r.pool.totalQty, n: r.pool.buyers })}</p>}
                 {r.note && <p className="mt-1 text-sm italic text-slate-600">“{r.note}”</p>}
 
@@ -129,7 +140,19 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                         const km = boot.distances[buyerId]?.[b.producerId];
                         return (
                           <tr key={b.id} data-testid={`bid-${r.id}-${b.producerId}`} className="border-t border-slate-100 align-top">
-                            <td className="py-1">{org.name}<div className="text-xs text-slate-500">{org.town}{km !== undefined && ` · ${t('km', { n: km })}`}</div><TrustChip producerId={b.producerId} boot={boot} /></td>
+                            <td className="py-1">{org.name}<div className="text-xs text-slate-500">{org.town}{km !== undefined && ` · ${t('km', { n: km })}`}</div><TrustChip producerId={b.producerId} boot={boot} />
+                              {(() => {
+                                const day = b.deliveryDate ?? r.deliveryDate;
+                                const { fit, shelf } = bidFit(boot, r.productId, b.producerId, r.deliveryDate, day);
+                                const special = isSpecialDelivery(boot, r.productId, b.producerId, r.buyerId, day);
+                                return (
+                                  <div className="mt-1 text-xs" data-testid={`bid-delivery-${r.id}-${b.producerId}`}>
+                                    <span className="font-medium">{t('bidDelivers', { date: shortDate(day, i18n.language) })}</span>
+                                    {fit !== 'on_day' && <span data-testid="bid-fit" data-fit={fit} className={`ml-1 rounded px-1.5 py-0.5 ${fit === 'early' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>{t(`fit_${fit}`, { time: duration(t, shelf) })}</span>}
+                                    {special && <span data-testid="bid-special" className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-sky-900">{t('specialDelivery')}</span>}
+                                  </div>
+                                );
+                              })()}</td>
                             <td className="py-1">£{b.price.toFixed(2)}</td>
                             <td className="py-1">{b.qty}</td>
                             <td className="py-1 text-slate-600">{b.note}</td>

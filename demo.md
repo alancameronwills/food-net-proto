@@ -146,13 +146,21 @@ This is the feature the network is built around: buyers can plan, and producers 
 
 1. As **Corner Deli**, open **Ask for something**. Request **40 kg of Heritage tomatoes** in three weeks, with a price you'd
    pay (say £6.50/kg) and a note (*"For the tasting menu"*). *"I'm asking for something nobody has listed for that date."*
-2. Point at the form's hint if the product is already on sale: *"If it's available now, it tells me, and links to Browse."*
-3. Switch to **Brynberian Market Garden** (and **Preseli Hill Farm** if you have a helper): the **Demand board** tab
-   shows the request, and their bell has a notification. Each **bids** a price and quantity with a message. Point out
-   that bids are **sealed**: a producer sees only how many bids there are, not what others offered.
-4. Back as the buyer: the bids appear with **drive distance, reliability and note**. Compare, then **Accept bid**.
+2. Try a day the product is **not normally delivered** (cheese goes out on Wednesdays; ask for it on a Thursday). The form
+   does not refuse: it says producers can offer a different day, an earlier one if it keeps long enough, or a special
+   delivery. *"Asking for what you need is never wrong; the producer decides what they can do."* Then point at the form's
+   hint if the product is already on sale: *"If it's available now, it tells me, and links to Browse."*
+3. Switch to a producer (**Brynberian Market Garden** for tomatoes, or **Brongest Creamery** if you asked for cheese) and
+   its **Demand board** tab; their bell has a notification. They **bid** a price, quantity and a message. Point out that
+   bids are **sealed**: a producer sees only how many bids there are, not what others offered. The bid form also has a
+   **Delivery day**, defaulting to the day asked for. Change it: an earlier day gets a note that the product keeps long
+   enough (*"keeps 2 months"*); a day outside their usual rounds gets *"this would be a special delivery"*.
+4. Back as the buyer: the bids appear with **drive distance, reliability, note and the day each proposes** (*Delivers Wed 18 Nov*),
+   with a chip for how it fits the day needed (*earlier, keeps 2 months* / *too early to keep* / *after the day needed*) and a
+   **Special delivery** tag where it applies. Compare, then **Accept bid**.
    *"Accepting creates a confirmed order, and the producer's supply for that week grows by exactly what they promised."*
-   Preseli Hill Farm has never sold tomatoes: its **My listings** now has them.
+   Preseli Hill Farm has never sold tomatoes: its **My listings** now has them. An accepted special delivery is marked on both
+   sides' orders and appears on the producer's run sheet for that day.
 5. Accept a smaller bid first, then a second: two producers can **fill one request together**. The other bids show
    *"Not chosen"* once it is full, and those producers are told.
 6. Show **Withdraw request** and its effect on producers' boards.
@@ -164,6 +172,11 @@ Then, in **Model Lab**, change **Speculative orders** and repeat step 1 each tim
 | **Open RFQ** | Producers bid, the buyer chooses | Is a price-comparison between local producers what you want? |
 | **First to accept** | The buyer must name a price; no bidding; the first producer to press *Accept at £X for all N* wins, the others are told it has gone | Is speed or price more important? Would you trust a price set by one side? |
 | **Pooled demand** | Several buyers asking for the same thing in the same week are merged; one producer bid is shared across them, and each buyer accepts for themselves | Would you want to club together with other buyers? |
+
+**Special delivery days (producers).** On the producer's **Orders** tab, *Special delivery days* lets them add a one-off day when
+they will be out delivering anyway (*"Going to Cardigan anyway"*). From then on buyers can order that producer's products for
+that day: in Browse the day works for them, marked **Special delivery**, and orders on it are marked the same way. Under *Area
+delivery days*, try a Sunday the dairy's round cannot reach, add the Saturday before, and watch the buyer's card turn green.
 
 ### 6. Change the other rules live (8 min), as the **operator**
 

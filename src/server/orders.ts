@@ -5,8 +5,8 @@ import type { Order, OrderLine, OrderStatus, Organisation, StockState, SupplyWin
 import type { Session, TxItem } from './db';
 import { emit, type EventParams, type EventType } from './events';
 import type { Result } from './producer';
-import { deliveryRule } from '../shared/delivery';
-import { getConfig, getDistances, listCategories, listListings, listOrgs, listProducts } from './store';
+import { deliveryRule, isUsualDay } from '../shared/delivery';
+import { getConfig, getDistances, listCategories, listExtraDays, listListings, listOrgs, listProducts } from './store';
 
 const fail = (status: 400 | 403 | 404 | 409, error: string): Result<never> => ({ ok: false, status, error });
 const MAX_LINES = 25; // a transaction holds at most 100 items; one order never gets near that
@@ -30,11 +30,13 @@ const winSk = (listingId: string, deliveryDate: string) => windowKey(listingId, 
 
 /** Context shared by the operations below, read fresh on every attempt. */
 async function load(s: Session) {
-  const [config, categories, products, listings, distances, orgs] = await Promise.all([
-    getConfig(s), listCategories(s), listProducts(s), listListings(s), getDistances(s), listOrgs(s),
+  const [config, categories, products, listings, distances, orgs, extras] = await Promise.all([
+    getConfig(s), listCategories(s), listProducts(s), listListings(s), getDistances(s), listOrgs(s), listExtraDays(s),
   ]);
+  const extraDates = (producerId: string) => extras.filter((e) => e.producerId === producerId).map((e) => e.date);
   return {
     config,
+    extraDates,
     orgs: new Map(orgs.map((o) => [o.id, o])),
     categories: new Map(categories.map((c) => [c.id, c])),
     products: new Map(products.map((p) => [p.id, p])),
@@ -139,7 +141,7 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
     merged.set(key, { listingId: raw.listingId, deliveryDate, qty: (have?.qty ?? 0) + (raw.qty as number), note: have?.note ?? note });
   }
 
-  const byOrder = new Map<string, { producerId: string; deliveryDate: string; lines: OrderLine[] }>();
+  const byOrder = new Map<string, { producerId: string; deliveryDate: string; lines: OrderLine[]; usual: boolean[] }>();
   const windows = new Map<string, SupplyWindow>();
   for (const want of merged.values()) {
     const { listingId, deliveryDate, qty } = want;
@@ -150,16 +152,17 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
     if (qty < listing.minOrder) return fail(400, `${product.name.en}: minimum order is ${listing.minOrder}`);
     const w = await s.get<SupplyWindow>('WINDOW', winSk(listingId, deliveryDate));
     if (w) windows.set(winSk(listingId, deliveryDate), w);
+    const rule = deliveryRule(ctx.config, category, listing, ctx.orgs.get(listing.producerId), ctx.orgs.get(actor.id)?.area, ctx.extraDates(listing.producerId));
     const av = availabilityFor({
       config: ctx.config, category, listing, window: w, date: deliveryDate, today,
-      driveKm: ctx.distances[actor.id]?.[listing.producerId] ?? Infinity,
-      rule: deliveryRule(ctx.config, category, listing, ctx.orgs.get(listing.producerId), ctx.orgs.get(actor.id)?.area),
+      driveKm: ctx.distances[actor.id]?.[listing.producerId] ?? Infinity, rule,
     });
     if (av.problem) return fail(409, `${product.name.en} ${REASON[av.problem]} (${deliveryDate})`);
     if (qty > av.orderable) return fail(409, `${product.name.en}: only ${av.orderable} available on ${deliveryDate}`);
     const unitPrice = unitPriceFor(ctx.config, listing, qty);
     const key = `${listing.producerId}|${deliveryDate}`;
-    const entry = byOrder.get(key) ?? { producerId: listing.producerId, deliveryDate, lines: [] };
+    const entry = byOrder.get(key) ?? { producerId: listing.producerId, deliveryDate, lines: [], usual: [] };
+    entry.usual.push(isUsualDay(rule, deliveryDate));
     entry.lines.push({ listingId, productId: product.id, qty, unitPrice, ...(want.note ? { note: want.note } : {}) });
     byOrder.set(key, entry);
   }
@@ -167,7 +170,7 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
   const caps = capabilities(ctx.config);
   const groupId = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const result: Placed = { orders: [], failed: [] };
-  for (const { producerId, deliveryDate, lines } of byOrder.values()) {
+  for (const { producerId, deliveryDate, lines, usual } of byOrder.values()) {
     const seq = await s.nextSeq('META', 'order-seq');
     const autoConfirm = !caps.producerConfirmsOrders; // "on placement": accepted automatically
     const stock: StockState = autoConfirm ? 'reserved' : caps.softHoldOnPlace ? 'held' : 'none';
@@ -175,6 +178,8 @@ export async function placeOrders(s: Session, actor: Organisation | undefined, b
     const at = nowIso();
     const order: Order = {
       id: `BL-${1000 + seq}`, groupId, buyerId: actor.id, producerId, deliveryDate, status, stock, lines, deliveryMode: ctx.config.delivery as Order['deliveryMode'],
+      // a delivery on none of the producer's usual days for these goods is a special one (the producer added the day)
+      ...(usual.some(Boolean) ? {} : { special: true }),
       total: Math.round(lines.reduce((n, l) => n + lineTotal(l.unitPrice, l.qty), 0) * 100) / 100,
       ...(orderNote ? { note: orderNote } : {}), createdAt: at, history: [{ at, status, by: actor.id }],
     };

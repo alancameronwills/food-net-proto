@@ -102,6 +102,8 @@ export type Order = {
   lines: OrderLine[];
   total: number;
   note?: string;
+  /** True when the delivery is outside the producer's usual days: arranged specially, for example to answer a request. */
+  special?: boolean;
   /** How it is being delivered, fixed when the order was placed. */
   deliveryMode?: 'producer' | 'area_days' | 'hub_courier';
   /** Set when the order arises from accepting a bid on a demand request. */
@@ -121,6 +123,8 @@ export type Bid = {
   producerId: string;
   price: number; // GBP per unit
   qty: number;
+  /** The day the producer offers to deliver. Defaults to the day the buyer needs it; may be earlier, later, or a special delivery. */
+  deliveryDate?: string;
   note?: string;
   createdAt: string;
   status: BidStatus;
@@ -152,3 +156,6 @@ export type RequestView = Omit<DemandRequest, 'version'> & {
   bidCount: number;
   pool?: { totalQty: number; requests: number; buyers: number };
 };
+
+/** A one-off delivery day a producer has added to their usual rounds. Buyers can order for it like any other delivery day. */
+export type ExtraDay = { producerId: string; date: string; note?: string };

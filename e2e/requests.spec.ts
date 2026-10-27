@@ -181,7 +181,7 @@ test.describe('speculative orders: open RFQ', () => {
     }
   });
 
-  test('requests are validated with a clear message', async ({ browser, request }) => {
+  test('a request for a day the product is not normally delivered is accepted, with a friendly note, not an error', async ({ browser, request }) => {
     const s = newSession();
     await setModel(request, s);
     const buyer = await person(browser, buyerUrl(s));
@@ -191,8 +191,10 @@ test.describe('speculative orders: open RFQ', () => {
       await form.getByLabel('Product').selectOption({ label: 'Blue cheese' });
       await form.getByLabel(/^Quantity/).fill('5');
       await form.getByLabel('Needed on').fill(FAR); // a Thursday; cheese is delivered on Wednesdays
+      await expect(form.getByTestId('date-note')).toContainText('not normally delivered');
       await form.getByRole('button', { name: 'Send request' }).click();
-      await expect(form.getByRole('alert')).toContainText('not delivered on that day');
+      await expect(form.getByRole('alert')).toHaveCount(0);
+      await expect(buyer.page.locator('[data-testid^="request-DR-"]').first()).toBeVisible();
     } finally {
       await buyer.close();
     }

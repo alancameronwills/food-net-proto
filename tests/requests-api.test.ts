@@ -67,8 +67,11 @@ describe.skipIf(!dbUp)('creating requests', () => {
     expect((await b.post('/requests', ask({ qty: 0 }))).status).toBe(400);
     expect((await b.post('/requests', ask({ deliveryDate: 'whenever' }))).status).toBe(400);
     expect((await b.post('/requests', ask({ targetPrice: -1 }))).status).toBe(400);
-    expect((await b.post('/requests', ask({ deliveryDate: todayIso() }))).body.error).toMatch(/notice/);
-    expect((await b.post('/requests', ask({ productId: 'cheese-blue', deliveryDate: DATE }))).body.error).toMatch(/not delivered on that day/); // cheese: Wednesdays
+    expect((await b.post('/requests', ask({ deliveryDate: todayIso() }))).status).toBe(400); // today has gone
+    expect((await b.post('/requests', ask({ deliveryDate: addDays(todayIso(), 400) }))).status).toBe(400);
+    // A day the product is not normally delivered on (cheese: Wednesdays), or at short notice, is still a fine thing to ask for
+    expect((await b.post('/requests', ask({ productId: 'cheese-blue', deliveryDate: DATE }))).status).toBe(200);
+    expect((await b.post('/requests', ask({ productId: 'cheese-blue', deliveryDate: addDays(todayIso(), 1) }))).status).toBe(200);
     expect((await as('dyfed-dairy').post('/requests', ask())).status).toBe(403); // producers do not ask
   });
 

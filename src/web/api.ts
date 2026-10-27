@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Area, Category, DriveDistances, Listing, Order, Organisation, Persona, Product, RequestView, SupplyWindow } from '../shared/types';
+import type { Area, Category, ExtraDay, DriveDistances, Listing, Order, Organisation, Persona, Product, RequestView, SupplyWindow } from '../shared/types';
 import type { ModelConfig } from '../shared/models';
 
 export type AppEvent = {
@@ -12,6 +12,7 @@ export type Bootstrap = {
   listings: Listing[]; distances: DriveDistances;
   reliability: Record<string, { score: number | null; orders: number }>;
   areas: Area[];
+  extraDays: ExtraDay[];
 };
 
 const params = new URLSearchParams(location.search);

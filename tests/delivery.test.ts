@@ -179,20 +179,19 @@ describe.skipIf(!dbUp)('delivery models through the API', () => {
     expect(tomorrow.body.error).toMatch(/more notice/); // milk needs 1 day normally, the hub needs 2
   });
 
-  it('requests follow the delivery model: hub days for requests, producer rounds for bids', async () => {
+  it('requests and bids are welcome on any day, whatever the delivery model: the producer can offer a different day or a special delivery', async () => {
     const { as, op } = await setup({ delivery: 'hub_courier', hubDays: [2, 4, 6] });
-    const badDate = await as('corner-deli').post('/requests', { productId: 'milk-whole', qty: 50, deliveryDate: addDays(MONDAY, 25) });
-    expect(badDate.status).toBe(400); // a Friday
-    expect(badDate.body.error).toMatch(/hub courier does not deliver/);
+    const friday = addDays(MONDAY, 25);
+    const thursday = addDays(MONDAY, 24);
+    const hotel = as('grand-hotel');
+    // Not a hub day: still accepted
+    const first = await hotel.post('/requests', { productId: 'milk-whole', qty: 50, deliveryDate: friday });
+    expect(first.status).toBe(200);
 
     await op.put('/config', { delivery: 'area_days' });
-    const hotel = as('grand-hotel');
-    const thursday = addDays(MONDAY, 24);
-    const friday = addDays(MONDAY, 25);
-    const id = (await hotel.post('/requests', { productId: 'milk-whole', qty: 50, deliveryDate: friday })).body.request.id; // any day is fine to ask for
-    const bid = await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 50 });
-    expect(bid.status).toBe(400); // but Dyfed Dairy does not drive to Mwnt on a Friday
-    expect(bid.body.error).toMatch(/does not deliver to that buyer's area on that day/);
+    const id = (await hotel.post('/requests', { productId: 'milk-whole', qty: 50, deliveryDate: friday })).body.request.id;
+    // Dyfed Dairy does not drive to Mwnt on a Friday, but may bid: it will be a special delivery
+    expect((await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 50 })).status).toBe(200);
     const id2 = (await hotel.post('/requests', { productId: 'milk-whole', qty: 50, deliveryDate: thursday })).body.request.id;
     expect((await as('dyfed-dairy').post(`/requests/${id2}/bids`, { price: 0.9, qty: 50 })).status).toBe(200);
   });

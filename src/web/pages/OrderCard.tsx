@@ -36,6 +36,7 @@ export function OrderCard({ order, boot, perspective, banner, actions }: {
         <span className="text-sm text-slate-600">{t(perspective === 'buyer' ? 'from' : 'buyerLabel')}: <b>{other?.name}</b> ({other?.town})</span>
         {perspective === 'buyer' && <TrustChip producerId={order.producerId} boot={boot} />}
         {order.deliveryMode && <span data-testid="delivery-mode" className="rounded bg-slate-100 px-1.5 text-xs text-slate-600">{t(`by_${order.deliveryMode}`)}</span>}
+        {order.special && <span data-testid="special-chip" className="rounded bg-sky-100 px-1.5 text-xs text-sky-900">{t('specialDelivery')}</span>}
         {order.source && <span className="rounded bg-brand-light px-1.5 text-xs text-brand">{order.source.requestId}</span>}
         <span className="ml-auto text-sm text-slate-600">{t('deliveryFor')}: <b>{fmtDate(order.deliveryDate, i18n.language)}</b></span>
       </div>

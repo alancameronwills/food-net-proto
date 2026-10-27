@@ -1,5 +1,5 @@
 import { addDays } from './dates';
-import { MAX_DAYS_AHEAD, type DeliveryRule } from './delivery';
+import { MAX_DAYS_AHEAD, isUsualDay, type DeliveryRule } from './delivery';
 import type { ModelConfig } from './models';
 import { availabilityFor, windowKey } from './orders';
 import type { Category, Confidence, Listing, SupplyWindow } from './types';
@@ -19,7 +19,7 @@ export function describeDays(days: number): { unit: 'day' | 'week' | 'month'; n:
 }
 
 /** A day on which this product could be delivered to this buyer, with stock to order. */
-export type Deliverable = { date: string; orderable: number; confidence: Confidence; farWarning?: boolean };
+export type Deliverable = { date: string; orderable: number; confidence: Confidence; farWarning?: boolean; /** a one-off delivery the producer has added, not one of their usual days */ special?: boolean };
 
 /** Every day from tomorrow on that this listing can be delivered to this buyer with stock to order (under the active models). */
 export function deliverableDates(a: {
@@ -33,7 +33,9 @@ export function deliverableDates(a: {
       config: a.config, category: a.category, listing: a.listing, window: a.windows.get(windowKey(a.listing.id, date)),
       date, today: a.today, driveKm: a.driveKm, rule: a.rule,
     });
-    if (!av.problem && av.orderable > 0) out.push({ date, orderable: av.orderable, confidence: av.confidence!, farWarning: av.farWarning });
+    if (!av.problem && av.orderable > 0) {
+      out.push({ date, orderable: av.orderable, confidence: av.confidence!, farWarning: av.farWarning, ...(isUsualDay(a.rule, date) ? {} : { special: true }) });
+    }
   }
   return out;
 }
@@ -58,4 +60,18 @@ export function availableForUse(delivery: Deliverable[], shelfLife: number, useO
     if (d.date > useOn && (!later || d.date < later)) later = d.date;
   }
   return { ok: false, shelfLife, earlier, later };
+}
+
+/**
+ * How well a delivery day suits the day the goods are needed.
+ * - on_day: delivered the day it is needed
+ * - early: earlier, but still within the product's shelf life, so fine
+ * - too_early: earlier than the shelf life allows, so it may not last until the day needed
+ * - late: after the day it is needed
+ */
+export type DeliveryFit = 'on_day' | 'early' | 'too_early' | 'late';
+export function deliveryFit(neededOn: string, deliveryDate: string, shelfLife: number): DeliveryFit {
+  if (deliveryDate === neededOn) return 'on_day';
+  if (deliveryDate > neededOn) return 'late';
+  return deliveryDate >= addDays(neededOn, -shelfLife) ? 'early' : 'too_early';
 }

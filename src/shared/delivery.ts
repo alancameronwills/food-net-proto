@@ -10,7 +10,11 @@ export type DeliveryMode = NonNullable<Order['deliveryMode']>;
 export type DeliveryProblem = 'not_delivery_day' | 'too_soon' | 'too_far' | 'no_route' | 'not_route_day' | 'not_hub_day';
 
 /** On which weekdays, and with how much notice, can something be delivered? Depends on the delivery model. */
-export type DeliveryRule = { mode: DeliveryMode; days: number[]; lead: number };
+export type DeliveryRule = {
+  mode: DeliveryMode; days: number[]; lead: number;
+  /** One-off days (YYYY-MM-DD) the producer has added; on these, the usual weekdays do not matter. */
+  extraDates?: string[];
+};
 
 export const leadDaysFor = (category: Category, listing?: Pick<Listing, 'leadDays'>) => listing?.leadDays ?? category.leadDays;
 
@@ -22,18 +26,25 @@ export const leadDaysFor = (category: Category, listing?: Pick<Listing, 'leadDay
  */
 export function deliveryRule(
   config: ModelConfig, category: Category, listing?: Pick<Listing, 'leadDays'>, producer?: Organisation, buyerArea?: string,
+  extraDates: string[] = [],
 ): DeliveryRule {
   const lead = leadDaysFor(category, listing);
+  // The hub courier decides its own days: a producer's one-off days do not apply to it
   if (config.delivery === 'hub_courier') return { mode: 'hub_courier', days: config.hubDays, lead: Math.max(lead, HUB_LEAD_DAYS) };
+  const extra = extraDates.length ? { extraDates } : {};
   if (config.delivery === 'area_days' && producer?.routes) {
-    return { mode: 'area_days', days: (buyerArea && producer.routes[buyerArea]) || [], lead };
+    return { mode: 'area_days', days: (buyerArea && producer.routes[buyerArea]) || [], lead, ...extra };
   }
-  return { mode: config.delivery === 'area_days' ? 'area_days' : 'producer', days: category.deliveryDays, lead };
+  return { mode: config.delivery === 'area_days' ? 'area_days' : 'producer', days: category.deliveryDays, lead, ...extra };
 }
+
+/** Is this one of the usual delivery days (not a one-off the producer added)? */
+export const isUsualDay = (rule: DeliveryRule, date: string): boolean => rule.days.includes(new Date(date + 'T00:00:00Z').getUTCDay());
 
 export function ruleProblem(rule: DeliveryRule, date: string, today: string): DeliveryProblem | null {
   if (date < addDays(today, rule.lead)) return 'too_soon';
   if (date > addDays(today, MAX_DAYS_AHEAD)) return 'too_far';
+  if (rule.extraDates?.includes(date)) return null; // a day the producer has added specially
   if (rule.mode === 'area_days' && rule.days.length === 0) return 'no_route';
   const dow = new Date(date + 'T00:00:00Z').getUTCDay();
   if (rule.days.includes(dow)) return null;

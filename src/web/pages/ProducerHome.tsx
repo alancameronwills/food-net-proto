@@ -9,6 +9,7 @@ import { loc } from '../i18n';
 import { ListingsEditor } from './ListingsEditor';
 import { useScreen } from '../screen';
 import { DemandBoard } from './DemandBoard';
+import { ExtraDays } from './ExtraDays';
 import { OrdersInbox } from './OrdersInbox';
 import { StockCard } from './StockEditor';
 
@@ -60,7 +61,10 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
           ? <DemandBoard producerId={me.id} boot={boot} requests={requests} reload={reload} />
           : <p className="text-slate-600">{t('commitmentsSoon')}</p>
       ) : tab === 'orders' ? (
-        <OrdersInbox orders={orders} boot={boot} reload={reload} producerId={me.id} />
+        <div className="space-y-6">
+          <ExtraDays producerId={me.id} boot={boot} reload={reload} />
+          <OrdersInbox orders={orders} boot={boot} reload={reload} producerId={me.id} />
+        </div>
       ) : tab === 'stock' ? (
         <div className="space-y-4">
           {mine.length === 0 && <p className="text-slate-600">{t('noListings')}</p>}

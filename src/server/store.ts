@@ -1,10 +1,10 @@
 import { DEFAULT_CONFIG, sanitiseConfig, type ModelConfig } from '../shared/models';
-import type { Area, DriveDistances, Listing, Organisation, SupplyWindow, Category, Product } from '../shared/types';
+import type { Area, DriveDistances, ExtraDay, Listing, Organisation, SupplyWindow, Category, Product } from '../shared/types';
 import { ensureTable, session, type Session } from './db';
 import { buildSeed, isoDate } from './seed';
 
 /** Item kinds that make up a demo session; `reset` wipes and reseeds all of them. */
-export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF', 'REQUEST', 'AREA'];
+export const KINDS = ['ORG', 'CATEGORY', 'PRODUCT', 'LISTING', 'WINDOW', 'DIST', 'CONFIG', 'META', 'ORDER', 'ACTIVITY', 'NOTIF', 'REQUEST', 'AREA', 'EXTRADAY'];
 
 /** Bumped whenever the starting data gains something older sessions lack; older sessions are upgraded in place on next use. */
 export const SEED_VERSION = 3;
@@ -117,6 +117,7 @@ export async function updateConfig(s: Session, patch: Record<string, unknown>): 
 
 export const listOrgs = (s: Session) => s.list<Organisation>('ORG');
 export const listAreas = (s: Session) => s.list<Area>('AREA');
+export const listExtraDays = (s: Session) => s.list<ExtraDay>('EXTRADAY');
 export const listCategories = (s: Session) => s.list<Category>('CATEGORY');
 export const listProducts = (s: Session) => s.list<Product>('PRODUCT');
 export const listListings = (s: Session) => s.list<Listing>('LISTING');

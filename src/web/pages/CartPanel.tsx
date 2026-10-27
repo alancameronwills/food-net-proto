@@ -43,6 +43,7 @@ export function CartPanel({ buyerId, boot, windows, lines: cartLines, setQty, se
     const days = deliverableDates({ config: boot.config, category: o.category, listing: o.listing, rule: o.rule, driveKm: o.driveKm, windows: byWindow, today });
     // The days this item could arrive and still be good for the day it is needed
     const options = days.filter((d) => d.date <= c.useOn && d.date >= addDaysTo(c.useOn, -shelf)).map((d) => d.date);
+    const specialDays = new Set(days.filter((d) => d.special).map((d) => d.date));
     const av = availabilityFor({ config: boot.config, category: o.category, listing: o.listing, window: byWindow.get(windowKey(c.listingId, c.deliveryDate)), date: c.deliveryDate, today, driveKm: o.driveKm, rule: o.rule });
     const unit = unitPriceFor(boot.config, o.listing, c.qty);
     const dayProblemNoAlt = !!av.problem && DAY_PROBLEMS.includes(av.problem) && options.length === 0;
@@ -50,7 +51,7 @@ export function CartPanel({ buyerId, boot, windows, lines: cartLines, setQty, se
     // The delivery day itself has stopped working (a changed round, an old basket): the nearest day that does is available
     const dayProblem = !!av.problem && DAY_PROBLEMS.includes(av.problem);
     const moveTo = dayProblem && options.length > 0 ? options[options.length - 1] : undefined;
-    return [{ c, o, shelf, options: options.includes(c.deliveryDate) ? options : [c.deliveryDate, ...options].sort(), unit, problem, moveTo, total: lineTotal(unit, c.qty) }];
+    return [{ c, o, shelf, specialDays, options: options.includes(c.deliveryDate) ? options : [c.deliveryDate, ...options].sort(), unit, problem, moveTo, total: lineTotal(unit, c.qty) }];
   });
   // Move any item whose delivery day no longer works, and say so
   const [moved, setMoved] = useState<{ id: string; name: string; from: string; to: string; useOn: string }[]>([]);
@@ -130,7 +131,7 @@ export function CartPanel({ buyerId, boot, windows, lines: cartLines, setQty, se
                     <label className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-700">{t('deliverOn')}
                       <select value={l.c.deliveryDate} aria-label={`${t('deliverOn')} ${loc(l.o.product.name)}`} data-testid="line-date" onChange={(e) => setDeliveryDate(l.c.key, e.target.value)}
                         className="rounded border border-slate-300 bg-white px-1 py-0.5">
-                        {l.options.map((d) => <option key={d} value={d}>{shortDate(d, i18n.language)}</option>)}
+                        {l.options.map((d) => <option key={d} value={d}>{shortDate(d, i18n.language)}{l.specialDays.has(d) ? ` (${t('specialDelivery').toLowerCase()})` : ''}</option>)}
                       </select>
                       <span className="text-slate-500" data-testid="line-use">{t('forUseOn', { date: shortDate(l.c.useOn, i18n.language), time: duration(t, l.shelf) })}</span>
                     </label>

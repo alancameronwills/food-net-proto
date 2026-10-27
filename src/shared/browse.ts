@@ -1,7 +1,7 @@
 import { localStatus, type ModelConfig } from './models';
 import { reservableLimit } from './orders';
 import { deliveryRule, type DeliveryRule } from './delivery';
-import type { Category, DriveDistances, Listing, Organisation, Product, SupplyWindow } from './types';
+import type { Category, DriveDistances, ExtraDay, Listing, Organisation, Product, SupplyWindow } from './types';
 
 export type Offer = {
   listing: Listing;
@@ -20,7 +20,7 @@ export function offersFor(
   buyerId: string,
   data: {
     config: ModelConfig; orgs: Organisation[]; categories: Category[]; products: Product[];
-    listings: Listing[]; distances: DriveDistances;
+    listings: Listing[]; distances: DriveDistances; extraDays?: ExtraDay[];
   },
 ): Offer[] {
   const orgs = new Map(data.orgs.map((o) => [o.id, o]));
@@ -35,7 +35,7 @@ export function offersFor(
     if (!product || !producer || !category || driveKm === undefined) continue;
     const status = localStatus(data.config, category.maxDriveKm, driveKm);
     const limitKm = data.config.localRange === 'flat' ? data.config.flatRadiusKm : category.maxDriveKm;
-    out.push({ listing, product, producer, category, driveKm, limitKm, status, rule: deliveryRule(data.config, category, listing, producer, orgs.get(buyerId)?.area) });
+    out.push({ listing, product, producer, category, driveKm, limitKm, status, rule: deliveryRule(data.config, category, listing, producer, orgs.get(buyerId)?.area, (data.extraDays ?? []).filter((e) => e.producerId === producer.id).map((e) => e.date)) });
   }
   return out.sort((a, b) => a.category.id.localeCompare(b.category.id) || a.driveKm - b.driveKm);
 }
