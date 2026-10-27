@@ -48,6 +48,8 @@ export function App() {
             </button>
           </div>
         </div>
+        {/* A reminder of what this is, in a red banner under the top line */}
+        <p data-testid="subhead" className="bg-red-600 px-4 py-1 text-center text-sm font-semibold text-white">{t('subhead')}</p>
         {/* Presenter banner: who am I, which model is on */}
         <div className="bg-brand-dark text-sm">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">

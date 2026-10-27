@@ -90,3 +90,24 @@ test('Welsh toggle switches the interface language', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'Pori' })).toBeVisible();
   await expect(page.getByText('Ei angen ar').first()).toBeVisible();
 });
+
+test('every page carries a red banner under the top line saying this is a prototype, in both languages', async ({ page }) => {
+  await page.goto(`/?s=${newSession()}`);
+  const banner = page.getByTestId('subhead');
+  await expect(banner).toHaveText('Prototype for experiment and discussion');
+  await expect(banner).toHaveCSS('background-color', 'rgb(220, 38, 38)');
+
+  // A full-width strip directly below the top line, which keeps its usual arrangement
+  const title = await page.getByRole('link', { name: /Bwyd Lleol Bro Teifi/ }).boundingBox();
+  const lang = await page.getByRole('button', { name: 'Cymraeg' }).boundingBox();
+  const box = await banner.boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(box!.width).toBeGreaterThanOrEqual(viewport.width - 20);
+  expect(box!.y).toBeGreaterThan(Math.max(title!.y + title!.height, lang!.y + lang!.height) - 2);
+  expect(Math.abs(title!.y + title!.height / 2 - (lang!.y + lang!.height / 2))).toBeLessThan(14); // title and buttons share one line
+
+  await page.getByRole('button', { name: 'Cymraeg' }).click();
+  await expect(banner).toHaveText('Prototeip ar gyfer arbrawf a thrafodaeth');
+  await page.goto(asBuyer(newSession())); // and on a role screen
+  await expect(page.getByTestId('subhead')).toBeVisible();
+});

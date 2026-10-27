@@ -6,6 +6,7 @@ import type { Bilingual } from '../shared/types';
 const en = {
   title: 'Bwyd Lleol Bro Teifi',
   tagline: 'Teifi Valley local food network',
+  subhead: 'Prototype for experiment and discussion',
   chooseRole: 'Who are you playing today?',
   chooseHint: 'Pick an organisation to see the network through their eyes. Share a link so others can join as another role.',
   buyers: 'Buyers', producers: 'Producers', operatorRole: 'Network operator',
@@ -126,6 +127,7 @@ const en = {
 const cy: typeof en = {
   title: 'Bwyd Lleol Bro Teifi',
   tagline: 'Rhwydwaith bwyd lleol Bro Teifi',
+  subhead: 'Prototeip ar gyfer arbrawf a thrafodaeth',
   chooseRole: 'Pwy ydych chi’n ei chwarae heddiw?',
   chooseHint: 'Dewiswch sefydliad i weld y rhwydwaith drwy ei lygaid. Rhannwch ddolen i eraill ymuno mewn rôl arall.',
   buyers: 'Prynwyr', producers: 'Cynhyrchwyr', operatorRole: 'Gweithredwr y rhwydwaith',
