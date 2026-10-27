@@ -22,6 +22,7 @@ const startScenario = (request: APIRequestContext, s: string, id: string) =>
 
 test.describe('guided scenarios', () => {
   test('the operator starts one from the launcher, and everyone sees the checklist', async ({ browser }) => {
+    test.slow(); // starting a scenario resets a whole session, which is slow when many browsers hammer the test database
     const s = newSession();
     const op = await person(browser, `/lab?s=${s}&as=operator`);
     const buyer = await person(browser, `/home?s=${s}&as=corner-deli`);
