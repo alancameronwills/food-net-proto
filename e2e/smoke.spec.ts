@@ -120,3 +120,34 @@ test('every page carries a red banner under the top line saying this is a protot
   await page.goto(asBuyer(newSession())); // and on a role screen
   await expect(page.getByTestId('subhead')).toBeVisible();
 });
+
+test('two tabs in one browser can play different roles, and a refresh keeps each tab on its own role', async ({ browser }) => {
+  const s = newSession();
+  const ctx = await browser.newContext(); // one browser profile: its local storage is shared by both tabs
+  try {
+    const nevern = await ctx.newPage();
+    await nevern.goto(`/?s=${s}`);
+    await nevern.getByRole('button', { name: /Nevern Bakery/ }).click();
+    await expect(nevern.getByText('Playing as: Nevern Bakery')).toBeVisible();
+
+    const caterer = await ctx.newPage();
+    await caterer.goto(`/?s=${s}`); // a new tab starts from the role used last...
+    await caterer.getByRole('button', { name: 'Switch role' }).click(); // ...and can pick another
+    await caterer.getByRole('button', { name: /Castle Caterers/ }).click();
+    await expect(caterer.getByText('Playing as: Castle Caterers')).toBeVisible();
+
+    await nevern.reload(); // the other tab's choice must not take over this one
+    await expect(nevern.getByText('Playing as: Nevern Bakery')).toBeVisible();
+    await caterer.reload();
+    await expect(caterer.getByText('Playing as: Castle Caterers')).toBeVisible();
+
+    // A link still wins, and a new tab opens as whoever was last chosen
+    const linked = await ctx.newPage();
+    await linked.goto(`/home?s=${s}&as=dyfed-dairy`);
+    await expect(linked.getByText('Playing as: Dyfed Dairy')).toBeVisible();
+    await nevern.reload();
+    await expect(nevern.getByText('Playing as: Nevern Bakery')).toBeVisible();
+  } finally {
+    await ctx.close();
+  }
+});

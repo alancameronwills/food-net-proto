@@ -18,3 +18,6 @@ export const mondayOf = (iso: string): string => {
 };
 
 export const isMonday = (iso: string): boolean => new Date(iso + 'T00:00:00Z').getUTCDay() === 1;
+
+/** How far ahead (in weeks from this Monday) supply can be planned: a little over a year. The stock table shows every one of them. */
+export const PLANNING_WEEKS = 56;

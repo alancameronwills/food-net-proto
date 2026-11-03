@@ -5,8 +5,8 @@
     "name": "Harbour Bistro",
     "kind": "restaurant",
     "town": "Fishguard",
-    "lat": 52,
-    "lon": -4.98,
+    "lat": 51.994,
+    "lon": -4.976,
     "blurb": {
       "en": "Seafront bistro with a daily-changing menu.",
       "cy": "Bistro glan môr gyda bwydlen sy’n newid bob dydd."
@@ -18,8 +18,8 @@
     "name": "Grand Hotel",
     "kind": "hotel",
     "town": "Mwnt",
-    "lat": 52.165,
-    "lon": -4.64,
+    "lat": 52.137,
+    "lon": -4.638,
     "blurb": {
       "en": "80-bedroom hotel with a busy breakfast and banqueting trade.",
       "cy": "Gwesty 80 ystafell gyda brecwast prysur a gwleddoedd."
@@ -32,7 +32,7 @@
     "kind": "retailer",
     "town": "Newport",
     "lat": 52.016,
-    "lon": -4.382,
+    "lon": -4.833,
     "blurb": {
       "en": "Independent delicatessen and village shop.",
       "cy": "Delicatessen annibynnol a siop pentref."
@@ -44,8 +44,8 @@
     "name": "Castle Caterers",
     "kind": "caterer",
     "town": "Cilgerran",
-    "lat": 52.057,
-    "lon": -4.364,
+    "lat": 52.055,
+    "lon": -4.633,
     "blurb": {
       "en": "Weddings and events across the county.",
       "cy": "Priodasau a digwyddiadau ar draws y sir."
@@ -57,8 +57,8 @@
     "name": "Preseli Hill Farm",
     "kind": "farm",
     "town": "Crymych",
-    "lat": 51.98,
-    "lon": -4.65,
+    "lat": 51.975,
+    "lon": -4.647,
     "blurb": {
       "en": "Upland lamb, beef and root vegetables.",
       "cy": "Oen, cig eidion a llysiau gwraidd o’r ucheldir."
@@ -120,8 +120,8 @@
     "name": "Dyfed Dairy",
     "kind": "dairy",
     "town": "Cenarth",
-    "lat": 52.04,
-    "lon": -4.54,
+    "lat": 52.045,
+    "lon": -4.526,
     "blurb": {
       "en": "Family dairy: milk, cream, eggs and cheddar.",
       "cy": "Llaethdy teuluol: llaeth, hufen, wyau a cheddar."
@@ -189,7 +189,7 @@
     "kind": "dairy",
     "town": "Brongest",
     "lat": 52.08,
-    "lon": -4.444,
+    "lon": -4.449,
     "blurb": {
       "en": "Small creamery making milk, cream and blue cheese.",
       "cy": "Hufenfa fach yn gwneud llaeth, hufen a chaws glas."
@@ -239,8 +239,8 @@
     "name": "Dinas Catch",
     "kind": "fisher",
     "town": "Dinas",
-    "lat": 52.02,
-    "lon": -4.909,
+    "lat": 52.013,
+    "lon": -4.897,
     "blurb": {
       "en": "Day-boat crab, lobster and line-caught fish.",
       "cy": "Cranc, cimwch a physgod llinell o’r cwch dydd."
@@ -301,7 +301,7 @@
     "kind": "baker",
     "town": "Nevern",
     "lat": 52.025,
-    "lon": -4.796,
+    "lon": -4.795,
     "blurb": {
       "en": "Sourdough and traditional Welsh bakes.",
       "cy": "Surdoes a nwyddau pobi Cymreig traddodiadol."
@@ -355,8 +355,8 @@
     "name": "Brynberian Market Garden",
     "kind": "farm",
     "town": "Brynberian",
-    "lat": 51.98,
-    "lon": -4.766,
+    "lat": 51.983,
+    "lon": -4.764,
     "blurb": {
       "en": "Seasonal vegetables, salads and free-range eggs.",
       "cy": "Llysiau tymhorol, saladau a wyau buarth."
@@ -419,8 +419,8 @@
     "name": "Teifi Butchers",
     "kind": "butcher",
     "town": "Cardigan",
-    "lat": 52.08,
-    "lon": -4.664,
+    "lat": 52.084,
+    "lon": -4.66,
     "blurb": {
       "en": "Local lamb, beef and sausages.",
       "cy": "Oen, cig eidion a selsig lleol."
@@ -472,8 +472,8 @@
     "name": "Netpool Seafood Packers",
     "kind": "packer",
     "town": "St Dogmaels",
-    "lat": 52.08,
-    "lon": -4.67,
+    "lat": 52.082,
+    "lon": -4.68,
     "blurb": {
       "en": "Packing and processing local shellfish and fish.",
       "cy": "Pacio a phrosesu pysgod cregyn a physgod lleol."
@@ -519,8 +519,8 @@
     "name": "Teifi Valley Cheese",
     "kind": "dairy",
     "town": "Newcastle Emlyn",
-    "lat": 52.04,
-    "lon": -4.47,
+    "lat": 52.039,
+    "lon": -4.469,
     "blurb": {
       "en": "Farmhouse cheeses and a little milk.",
       "cy": "Cawsiau fferm ac ychydig o laeth."
@@ -565,8 +565,8 @@
     "name": "Bwyd Bro'r Garreg Las",
     "kind": "network",
     "town": "Rhosygilwen",
-    "lat": 52.03,
-    "lon": -4.619,
+    "lat": 52.029,
+    "lon": -4.616,
     "blurb": {
       "en": "Network operator: onboarding, models and oversight.",
       "cy": "Gweithredwr y rhwydwaith: ymuno, modelau a goruchwylio."

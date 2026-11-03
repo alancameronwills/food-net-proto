@@ -2,7 +2,7 @@ import '../src/server/env-local';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { app } from '../src/server/app';
 import { ensureTable, session } from '../src/server/db';
-import { addDays, mondayOf, todayIso } from '../src/shared/dates';
+import { addDays, mondayOf, PLANNING_WEEKS, todayIso } from '../src/shared/dates';
 import type { Listing, SupplyWindow } from '../src/shared/types';
 
 // Integration tests against DynamoDB Local (`npm run db:up`); skipped when it isn't running.
@@ -55,7 +55,7 @@ describe.skipIf(!dbUp)('producer stock API', () => {
     const p = client(sid, 'dyfed-dairy');
     const base = { listingId: LISTING, start: THIS_MONDAY, qtyTotal: 10, confidence: 'in_stock' };
     expect((await p.put('/windows', { ...base, start: addDays(THIS_MONDAY, 1) })).status).toBe(400); // not a Monday
-    expect((await p.put('/windows', { ...base, start: addDays(THIS_MONDAY, 7 * 60) })).status).toBe(400); // too far ahead
+    expect((await p.put('/windows', { ...base, start: addDays(THIS_MONDAY, 7 * (PLANNING_WEEKS + 1)) })).status).toBe(400); // too far ahead
     expect((await p.put('/windows', { ...base, qtyTotal: -1 })).status).toBe(400);
     expect((await p.put('/windows', { ...base, qtyTotal: 1.5 })).status).toBe(400);
     expect((await p.put('/windows', { ...base, confidence: 'maybe' })).status).toBe(400);
@@ -75,16 +75,56 @@ describe.skipIf(!dbUp)('producer stock API', () => {
     expect((await p.del(`/listings/${LISTING}`)).status).toBe(409);
   });
 
-  it('creates a new week when none exists, and bulk-adds only missing weeks', async () => {
+  it('creates a new week when none exists, and bulk-adds the next unset weeks without touching set ones', async () => {
     const prod = client(sid, 'dinas-catch');
     const listing = (await prod.get('/bootstrap')).body.listings.find((l: Listing) => l.producerId === 'dinas-catch');
     const far = addDays(THIS_MONDAY, 7 * 20);
-    expect((await prod.put('/windows', { listingId: listing.id, start: far, qtyTotal: 12, confidence: 'provisional' })).status).toBe(200);
-    const bulk = await prod.post('/windows/bulk', { listingId: listing.id, from: addDays(far, -7), weeks: 3, qtyTotal: 5, confidence: 'forecast' });
+    expect((await prod.put('/windows', { listingId: listing.id, start: far, qtyTotal: 12, confidence: 'in_stock' })).status).toBe(200);
+    const bulk = await prod.post('/windows/bulk', { listingId: listing.id, from: addDays(far, -7), weeks: 3, qtyTotal: 5, confidence: 'provisional' });
     expect(bulk.status).toBe(200);
-    expect(bulk.body.created).toBe(2); // the middle week already existed
+    // Starts at the first unset week (far - 7), skips the week that is set, and carries on to find 3 unset weeks
+    expect(bulk.body.starts).toEqual([addDays(far, -7), addDays(far, 7), addDays(far, 14)]);
     const mine = ((await prod.get('/windows')).body as SupplyWindow[]).filter((w) => w.listingId === listing.id);
-    expect(mine.find((w) => w.start === far)?.qtyTotal).toBe(12); // untouched by bulk
+    expect(mine.find((w) => w.start === far)).toMatchObject({ qtyTotal: 12, confidence: 'in_stock' }); // untouched by bulk
+    expect(mine.find((w) => w.start === addDays(far, 7))).toMatchObject({ qtyTotal: 5, confidence: 'provisional', qtyReserved: 0 });
+    // Nothing unset left to fill within reach: nothing is created, nothing changes
+    const last = addDays(THIS_MONDAY, 7 * PLANNING_WEEKS);
+    const none = await prod.post('/windows/bulk', { listingId: listing.id, from: last, weeks: 4, qtyTotal: 1, confidence: 'forecast' });
+    expect(none.body.created).toBe(1); // only the final week is within reach
+    expect((await prod.post('/windows/bulk', { listingId: listing.id, from: last, weeks: 4, qtyTotal: 1, confidence: 'forecast' })).body.created).toBe(0);
+  });
+
+  it('lets a producer list a product the system has not seen before, and others can then list it too', async () => {
+    const own = newSession();
+    const p = client(own, 'brynberian-garden');
+    const body = { pricePerUnit: 7, minOrder: 2, newProduct: { name: '  Wild   garlic ', category: 'veg', unit: 'kg' } };
+    const add = await p.post('/listings', body);
+    expect(add.status).toBe(200);
+    expect(add.body.listing).toMatchObject({ id: 'brynberian-garden:veg-wild-garlic', productId: 'veg-wild-garlic' });
+    const boot = (await p.get('/bootstrap')).body;
+    expect(boot.products.find((x: any) => x.id === 'veg-wild-garlic')).toMatchObject({ name: { en: 'Wild garlic', cy: 'Wild garlic' }, category: 'veg', unit: 'kg' });
+
+    // The same name again, from another producer or in other letters, joins the existing product rather than making a twin
+    const other = await client(own, 'preseli-hill-farm').post('/listings', { pricePerUnit: 8, minOrder: 1, newProduct: { name: 'WILD GARLIC', category: 'veg', unit: 'kg' } });
+    expect(other.body.listing.productId).toBe('veg-wild-garlic');
+    expect((await p.post('/listings', body)).status).toBe(409); // already listed by this producer
+    expect(((await p.get('/bootstrap')).body.products as any[]).filter((x) => x.name.en === 'Wild garlic')).toHaveLength(1);
+
+    // A known name (even in Welsh) reuses the catalogue entry
+    const known = await client(own, 'dyfed-dairy').post('/listings', { pricePerUnit: 1, minOrder: 1, newProduct: { name: 'whole milk', category: 'veg', unit: 'each' } });
+    expect(known.status).toBe(409); // dyfed-dairy already sells whole milk: matched, not duplicated
+  });
+
+  it('rejects a new product with no name, no category or no unit, and creates nothing', async () => {
+    const own = newSession();
+    const p = client(own, 'brynberian-garden');
+    const price = { pricePerUnit: 7, minOrder: 2 };
+    expect((await p.post('/listings', { ...price, newProduct: { name: ' ', category: 'veg', unit: 'kg' } })).status).toBe(400);
+    expect((await p.post('/listings', { ...price, newProduct: { name: 'Nettles', category: 'unicorn', unit: 'kg' } })).status).toBe(400);
+    expect((await p.post('/listings', { ...price, newProduct: { name: 'Nettles', category: 'veg', unit: 'bucket' } })).status).toBe(400);
+    expect((await p.post('/listings', { pricePerUnit: 0, minOrder: 2, newProduct: { name: 'Nettles', category: 'veg', unit: 'kg' } })).status).toBe(400);
+    expect(((await p.get('/bootstrap')).body.products as any[]).some((x) => x.name.en === 'Nettles')).toBe(false);
+    expect((await client(own, 'grand-hotel').post('/listings', { ...price, newProduct: { name: 'Nettles', category: 'veg', unit: 'kg' } })).status).toBe(403);
   });
 
   it('adds, prices (with volume tiers), edits and removes listings', async () => {

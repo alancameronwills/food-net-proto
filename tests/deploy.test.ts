@@ -199,7 +199,7 @@ describe.skipIf(!dbUp)('the packaged API, as AWS would run it', () => {
       for (const e of events) { const r = await handler(e); out.push({ statusCode: r.statusCode, headers: r.headers, body: r.body }); }
       console.log('RESULT' + JSON.stringify(out));`;
     const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
-      encoding: 'utf8', env: { ...process.env, EVENTS: JSON.stringify(events), DYNAMODB_ENDPOINT: 'http://localhost:8000', AWS_REGION: 'eu-west-2' },
+      encoding: 'utf8', env: { ...process.env, EVENTS: JSON.stringify(events), DYNAMODB_ENDPOINT: process.env.DYNAMODB_ENDPOINT ?? 'http://localhost:8000', AWS_REGION: 'eu-west-2' },
     });
     const line = r.stdout.split('\n').find((l) => l.startsWith('RESULT'));
     if (!line) throw new Error(`The packaged API did not run:\n${r.stderr}\n${r.stdout}`);

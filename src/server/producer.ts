@@ -1,7 +1,7 @@
-import { addDays, isIsoDate, isMonday, mondayOf, todayIso } from '../shared/dates';
-import type { Confidence, Listing, Organisation, SupplyWindow } from '../shared/types';
+import { addDays, isIsoDate, isMonday, mondayOf, PLANNING_WEEKS, todayIso } from '../shared/dates';
+import type { Confidence, Listing, Organisation, Product, SupplyWindow, Unit } from '../shared/types';
 import type { Session } from './db';
-import { getConfig, listProducts } from './store';
+import { getConfig, listCategories, listProducts } from './store';
 import { reviewSupplyCut } from './supply';
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; status: 400 | 403 | 404 | 409; error: string };
@@ -9,8 +9,6 @@ const fail = (status: 400 | 403 | 404 | 409, error: string): Result<never> => ({
 
 export const CONFIDENCES: Confidence[] = ['in_stock', 'forecast', 'provisional'];
 const MAX_QTY = 100_000;
-/** Windows may start from last week up to ~6 months ahead. */
-const MAX_WEEKS_AHEAD = 26;
 
 export const winSk = (listingId: string, start: string) => `${listingId}#${start}`;
 
@@ -55,12 +53,39 @@ function cleanShelfLife(v: unknown): Result<{ shelfLifeDays: number | null | und
   return { ok: true, shelfLifeDays: v };
 }
 
+const UNITS: Unit[] = ['litre', 'kg', 'dozen', 'loaf', 'each', 'crate'];
+
+/** A product the system has not met before, typed in by a producer. A name that matches a known product reuses it. */
+async function newProduct(s: Session, known: Product[], raw: unknown): Promise<Result<{ product: Product; isNew: boolean }>> {
+  const b = (raw ?? {}) as Record<string, unknown>;
+  const name = typeof b.name === 'string' ? b.name.trim().replace(/\s+/g, ' ') : '';
+  if (name.length < 2 || name.length > 60) return fail(400, 'Give the product a name of 2 to 60 characters');
+  const same = known.find((p) => p.name.en.toLowerCase() === name.toLowerCase() || p.name.cy.toLowerCase() === name.toLowerCase());
+  if (same) return { ok: true, product: same, isNew: false };
+  const categories = await listCategories(s);
+  if (typeof b.category !== 'string' || !categories.some((c) => c.id === b.category)) return fail(400, 'Choose a category for the new product');
+  if (!UNITS.includes(b.unit as Unit)) return fail(400, 'Choose a unit for the new product');
+  const slug = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'item';
+  // The Welsh name is not known: the same text shows in both languages until someone translates it
+  const product: Product = { id: `${b.category}-${slug}`, category: b.category as Product['category'], name: { en: name, cy: name }, unit: b.unit as Unit, allergens: [], season: [] };
+  if (known.some((p) => p.id === product.id)) product.id = `${product.id}-${known.length}`;
+  return { ok: true, product, isNew: true };
+}
+
 export async function addListing(s: Session, actor: Organisation | undefined, body: Record<string, any>): Promise<Result<{ listing: Listing }>> {
   if (!actor || (actor.role !== 'producer' && actor.role !== 'operator')) return fail(403, 'Only producers can add listings');
   const producerId = actor.role === 'operator' ? body.producerId : actor.id;
   const producer = typeof producerId === 'string' ? await s.get<Organisation>('ORG', producerId) : undefined;
   if (!producer || producer.role !== 'producer') return fail(400, 'Unknown producer');
-  const product = (await listProducts(s)).find((p) => p.id === body.productId);
+  const known = await listProducts(s);
+  let product = known.find((p) => p.id === body.productId);
+  let created: Product | undefined;
+  if (!product && body.newProduct !== undefined) {
+    const made = await newProduct(s, known, body.newProduct);
+    if (!made.ok) return made;
+    product = made.product;
+    if (made.isNew) created = product;
+  }
   if (!product) return fail(400, 'Unknown product');
   if (!isMoney(body.pricePerUnit)) return fail(400, 'pricePerUnit must be a positive number');
   if (!isMoney(body.minOrder)) return fail(400, 'minOrder must be a positive number');
@@ -73,6 +98,7 @@ export async function addListing(s: Session, actor: Organisation | undefined, bo
     pricePerUnit: body.pricePerUnit, minOrder: body.minOrder, certifications: [], tiers: tiers.tiers,
     ...(typeof shelf.shelfLifeDays === 'number' ? { shelfLifeDays: shelf.shelfLifeDays } : {}),
   };
+  if (created && !(await s.create('PRODUCT', created.id, created))) return fail(409, 'That product was just added: try again');
   if (!(await s.create('LISTING', listing.id, listing))) return fail(409, 'You already list this product');
   return { ok: true, listing };
 }
@@ -108,7 +134,7 @@ export async function removeListing(s: Session, actor: Organisation | undefined,
 function checkWeek(start: unknown): Result<{ start: string }> {
   if (!isIsoDate(start) || !isMonday(start)) return fail(400, 'start must be a Monday (YYYY-MM-DD)');
   const first = addDays(mondayOf(todayIso()), -7);
-  const last = addDays(mondayOf(todayIso()), MAX_WEEKS_AHEAD * 7);
+  const last = addDays(mondayOf(todayIso()), PLANNING_WEEKS * 7);
   if (start < first || start > last) return fail(400, `start must be between ${first} and ${last}`);
   return { ok: true, start };
 }
@@ -141,24 +167,25 @@ export async function upsertWindow(s: Session, actor: Organisation | undefined, 
   return { ok: true, window, flagged };
 }
 
-/** Add `weeks` weeks of supply starting at `from`, skipping weeks that already exist. */
-export async function addWeeks(s: Session, actor: Organisation | undefined, body: Record<string, any>): Promise<Result<{ created: number }>> {
+/**
+ * Add `weeks` new weeks of supply. Weeks that already have a quantity are never touched: starting at the first unset week
+ * on or after `from`, the next `weeks` unset weeks are created (up to a year ahead).
+ */
+export async function addWeeks(s: Session, actor: Organisation | undefined, body: Record<string, any>): Promise<Result<{ created: number; starts: string[] }>> {
   const got = await ownedListing(s, actor, body.listingId);
   if (!got.ok) return got;
   const first = checkWeek(body.from);
   if (!first.ok) return first;
   if (!Number.isInteger(body.weeks) || body.weeks < 1 || body.weeks > 12) return fail(400, 'weeks must be 1 to 12');
   if (!isQty(body.qtyTotal) || !CONFIDENCES.includes(body.confidence)) return fail(400, 'qtyTotal and confidence required');
-  let created = 0;
-  for (let i = 0; i < body.weeks; i++) {
-    const start = addDays(first.start, i * 7);
-    if (checkWeek(start).ok === false) break;
+  const starts: string[] = [];
+  for (let start = first.start; starts.length < body.weeks && checkWeek(start).ok; start = addDays(start, 7)) {
     const w: SupplyWindow = {
       listingId: got.listing.id, start, end: addDays(start, 6), qtyTotal: body.qtyTotal, qtyReserved: 0, confidence: body.confidence,
     };
-    if (await s.create('WINDOW', winSk(got.listing.id, start), w)) created++;
+    if (await s.create('WINDOW', winSk(got.listing.id, start), w)) starts.push(start); // false: the week is already set
   }
-  return { ok: true, created };
+  return { ok: true, created: starts.length, starts };
 }
 
 export async function removeWindow(s: Session, actor: Organisation | undefined, listingId: string, start: string): Promise<Result> {

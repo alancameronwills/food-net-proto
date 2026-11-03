@@ -18,6 +18,8 @@ Commit messages end with the Co-Authored-By line given in the session's attribut
   after a day of runs, reseeding slows and tests hit the 20 s timeout (full run 650 s instead of 215 s). After restarting, wait for it
   to come up: if it is not ready, the database tests are **skipped** (e.g. "81 passed | 93 skipped"), and the deploy gate then passes without
   really testing. Re-run `npx vitest run` and check for 174 passed.
+- After a Docker restart, `localhost:8000` can reset connections (IPv6 proxy) while `127.0.0.1:8000` works; the API then returns "Internal error" and
+  every e2e test fails. Run with `DYNAMODB_ENDPOINT=http://127.0.0.1:8000` (and stop any stale `src/server/local.ts` process first).
 - Do not run Playwright while Vitest runs, or two Playwright runs at once: they share the local server and DynamoDB, and flake.
 - The AWS account's **Lambda concurrency limit is 10**. A burst of more than a few simultaneous requests can get 503/429. Warm up with
   `--concurrency 4`. The web app retries throttled GETs. Ask AWS Service Quotas for 100+ if more people will join.

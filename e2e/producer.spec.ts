@@ -1,5 +1,5 @@
 import { expect, test, type Browser } from '@playwright/test';
-import { addDays, mondayOf, todayIso } from '../src/shared/dates';
+import { addDays, mondayOf, PLANNING_WEEKS, todayIso } from '../src/shared/dates';
 
 let n = 0;
 const newSession = () => `pw-${Date.now().toString(36)}-p${n++}-${Math.random().toString(36).slice(2, 6)}`;
@@ -20,7 +20,7 @@ test.describe('producer: stock & forecast editor', () => {
     const card = page.getByTestId(MILK);
     await expect(card.getByRole('heading', { name: 'Whole milk' })).toBeVisible();
     const thisWeek = card.getByTestId(`week-${MONDAY}`);
-    await expect(thisWeek.getByRole('combobox')).toHaveValue('in_stock');
+    await expect(thisWeek.getByRole('button', { name: /Confidence.*In stock/ })).toBeVisible();
     await expect(thisWeek.getByText(/Buyers can order/)).toBeVisible();
     // A week with no supply planned yet offers an add button
     await expect(card.getByRole('button', { name: '+ Add' }).first()).toBeVisible();
@@ -40,8 +40,76 @@ test.describe('producer: stock & forecast editor', () => {
   test('changing confidence to provisional means buyers cannot order it yet', async ({ page }) => {
     await page.goto(producerUrl(newSession()));
     const cell = page.getByTestId(MILK).getByTestId(`week-${MONDAY}`);
-    await cell.getByRole('combobox').selectOption('provisional');
+    await cell.getByRole('button', { name: /Confidence/ }).click(); // in stock -> provisional
+    await expect(cell.getByTestId('conf-flash')).toHaveText('Provisional');
     await expect(cell.getByText('Buyers can order: 0')).toBeVisible();
+  });
+
+  test('the confidence icon cycles provisional, forecast, in stock, and the old card layout is one click away', async ({ page }) => {
+    await page.goto(producerUrl(newSession()));
+    const cell = page.getByTestId(MILK).getByTestId(`week-${MONDAY}`);
+    const icon = cell.getByRole('button', { name: /Confidence/ });
+    await icon.click();
+    await expect(icon).toHaveAttribute('data-confidence', 'provisional');
+    await icon.click();
+    await expect(icon).toHaveAttribute('data-confidence', 'forecast');
+    await expect(cell.getByTestId('conf-flash')).toHaveText('Forecast');
+    await icon.click();
+    await expect(icon).toHaveAttribute('data-confidence', 'in_stock');
+    await expect(cell.getByTestId('conf-flash')).toHaveCount(0, { timeout: 5_000 }); // the label fades after a moment
+    await page.getByRole('button', { name: 'Cards' }).click();
+    await expect(page.getByTestId(MILK).getByTestId(`week-${MONDAY}`).getByRole('combobox')).toHaveValue('in_stock');
+    await page.getByRole('button', { name: 'Table' }).click();
+    await expect(page.getByTestId('stock-scroll')).toBeVisible();
+  });
+
+  test('"Add next 4 weeks" adds only unset weeks, as provisional, and leaves set weeks alone', async ({ page }) => {
+    await page.goto(producerUrl(newSession()));
+    const row = page.getByTestId('stock-dyfed-dairy:cheese-cheddar');
+    const all = row.locator('[data-testid^="week-"]');
+    await expect(row.getByTestId(`week-${MONDAY}`)).toBeVisible();
+    const before = await all.count(); // the seed sets the first few weeks
+    const firstQty = await row.getByTestId(`week-${MONDAY}`).getByRole('spinbutton').inputValue();
+    const firstGap = addDays(MONDAY, 7 * before);
+    await expect(row.getByTestId(`empty-${firstGap}`)).toBeVisible();
+    await row.getByRole('button', { name: 'Add next 4 weeks' }).click();
+    await expect(page.getByRole('combobox')).toHaveValue('provisional'); // the form starts at provisional
+    await page.getByLabel('Quantity', { exact: true }).fill('77');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('bulk-done')).toContainText('4 weeks added');
+    await expect(all).toHaveCount(before + 4, { timeout: 10_000 });
+    const added = row.getByTestId(`week-${firstGap}`);
+    await expect(added.getByRole('spinbutton')).toHaveValue('77');
+    await expect(added.getByRole('button', { name: /Confidence/ })).toHaveAttribute('data-confidence', 'provisional');
+    await expect(row.getByTestId(`week-${MONDAY}`).getByRole('spinbutton')).toHaveValue(firstQty); // a set week is unchanged
+    // Again: carries on from the next gap, still leaving everything else alone
+    await row.getByRole('button', { name: 'Add next 4 weeks' }).click();
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('bulk-done')).toContainText('4 weeks added');
+    await expect(row.getByTestId(`week-${firstGap}`).getByRole('spinbutton')).toHaveValue('77');
+  });
+
+  test('the table runs a year ahead, can be panned that far, and the last week can be filled in', async ({ page }) => {
+    await page.goto(producerUrl(newSession()));
+    const row = page.getByTestId('stock-dyfed-dairy:cheese-cheddar');
+    const last = addDays(MONDAY, 7 * PLANNING_WEEKS);
+    const empty = row.getByTestId(`empty-${last}`);
+    await expect(empty).toBeAttached();
+    await page.getByTestId('stock-scroll').evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+    await expect(empty).toBeInViewport();
+    await expect(page.getByRole('columnheader').last()).toBeInViewport(); // the date header is still there
+    await expect(row.getByRole('rowheader')).toBeInViewport(); // and so is the product name
+    await empty.getByRole('button', { name: '+ Add' }).click();
+    await expect(row.getByTestId(`week-${last}`)).toBeVisible();
+  });
+
+  test('a single added week starts as provisional', async ({ page }) => {
+    await page.goto(producerUrl(newSession()));
+    const row = page.getByTestId('stock-dyfed-dairy:cheese-cheddar');
+    await expect(row.getByTestId(`week-${MONDAY}`)).toBeVisible();
+    const gap = addDays(MONDAY, 7 * (await row.locator('[data-testid^="week-"]').count()));
+    await row.getByTestId(`empty-${gap}`).getByRole('button', { name: '+ Add' }).click();
+    await expect(row.getByTestId(`week-${gap}`).getByRole('button', { name: /Confidence/ })).toHaveAttribute('data-confidence', 'provisional');
   });
 
   test('a week can be added and removed', async ({ page }) => {
@@ -64,7 +132,7 @@ test.describe('producer: stock & forecast editor', () => {
     const op = await person(browser, `/lab?s=${s}&as=operator`);
     try {
       const forecastWeek = producer.page.getByTestId(MILK).locator('[data-testid^="week-"]').nth(2); // seeded as forecast
-      await expect(forecastWeek.getByRole('combobox')).toHaveValue('forecast');
+      await expect(forecastWeek.getByRole('button', { name: /Confidence/ })).toHaveAttribute('data-confidence', 'forecast');
       const qty = Number(await forecastWeek.getByRole('spinbutton').inputValue());
       await expect(forecastWeek.getByText(`Buyers can order: ${Math.floor(qty * 0.7)}`)).toBeVisible(); // default: 70% of forecast
 
@@ -103,6 +171,29 @@ test.describe('producer: listings', () => {
       producer.page.once('dialog', (d) => d.accept());
       await producer.page.getByTestId('listing-dyfed-dairy:meat-lamb').getByRole('button', { name: 'Remove' }).click();
       await expect(dyfedLamb).toHaveCount(0, { timeout: 10_000 });
+    } finally {
+      await producer.close();
+      await buyer.close();
+    }
+  });
+
+  test('a producer can add a product that is not in the list, and buyers see it', async ({ browser }) => {
+    const s = newSession();
+    const producer = await person(browser, producerUrl(s));
+    const buyer = await person(browser, `/home?s=${s}&as=harbour-bistro`);
+    try {
+      await buyer.page.getByLabel('Only what I can order').uncheck();
+      await producer.page.getByRole('tab', { name: 'My listings' }).click();
+      await producer.page.getByRole('button', { name: 'Add a product to sell' }).click();
+      await producer.page.getByLabel('Product', { exact: true }).selectOption({ label: '+ A new product not in this list…' });
+      await producer.page.getByLabel('Product name').fill('Smoked ham');
+      await producer.page.getByLabel('Kind of food').selectOption({ label: 'Meat' });
+      await producer.page.getByLabel('Sold by').selectOption({ label: 'kg' });
+      await producer.page.getByLabel(/Price per unit/).fill('7.5');
+      await producer.page.getByRole('button', { name: 'Save' }).click();
+      await expect(producer.page.getByTestId('listing-dyfed-dairy:meat-smoked-ham')).toContainText('Smoked ham');
+      await expect(producer.page.getByTestId('listing-dyfed-dairy:meat-smoked-ham')).toContainText('£7.50');
+      await expect(buyer.page.getByTestId('offer-dyfed-dairy:meat-smoked-ham')).toHaveCount(1, { timeout: 10_000 });
     } finally {
       await producer.close();
       await buyer.close();

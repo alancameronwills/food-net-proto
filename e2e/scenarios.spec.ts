@@ -105,7 +105,9 @@ test.describe('guided scenarios', () => {
       const cell = producer.page.getByTestId('stock-dyfed-dairy:milk-whole').getByTestId(`week-${week}`);
       await expect(cell.getByText('80 reserved')).toBeVisible(); // two buyers have 40 each
       await openSteps(producer.page);
-      await cell.getByRole('combobox').selectOption('provisional');
+      const icon = cell.getByRole('button', { name: /Confidence/ });
+      await icon.click(); // forecast -> in stock
+      await icon.click(); // -> provisional
       await expect(producer.page.getByTestId('cut-warning')).toContainText('2 order(s)');
       await expect(producer.page.getByTestId('scenario-step-0')).toHaveAttribute('data-done', 'true', { timeout: 10_000 });
 

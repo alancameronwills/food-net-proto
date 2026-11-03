@@ -47,6 +47,35 @@ async function bid(page: Page, id: string, price: number, qty: number, note?: st
   await expect(card.getByTestId('my-bid')).toContainText(`£${price.toFixed(2)} × ${qty}`);
 }
 
+test.describe('speculative orders: who will see a request', () => {
+  test('the buyer is warned when nobody who sells it is within local range, and told how many will see it otherwise', async ({ browser }) => {
+    const s = newSession();
+    // Fishguard is 42 km or more from every dairy, and milk has a 20 km limit; Cilgerran is 10 km from Dyfed Dairy
+    const bistro = await person(browser, buyerUrl(s, 'harbour-bistro'));
+    const caterer = await person(browser, buyerUrl(s, 'castle-caterers'));
+    try {
+      await bistro.page.getByRole('tab', { name: /^Ask for something/ }).click();
+      const form = bistro.page.getByTestId('request-form');
+      await form.getByLabel('Product').selectOption({ label: 'Whole milk' });
+      await expect(form.getByTestId('reach-form')).toHaveAttribute('data-reach', 'reachNoSellers');
+      await expect(form.getByTestId('reach-form')).toContainText('Nobody who sells this is within local range');
+      await form.getByLabel('Product').selectOption({ label: 'Bara brith' }); // Nevern Bakery is 17 km away
+      await expect(form.getByTestId('reach-form')).toHaveAttribute('data-reach', 'reachSome');
+
+      // The warning stays on the request once it is sent
+      const id = await askFor(bistro.page, { product: 'Whole milk', qty: 10 });
+      await expect(bistro.page.getByTestId(`request-${id}`).getByTestId('reach-request')).toHaveAttribute('data-reach', 'reachNoSellers');
+
+      await caterer.page.getByRole('tab', { name: /^Ask for something/ }).click();
+      await caterer.page.getByTestId('request-form').getByLabel('Product').selectOption({ label: 'Whole milk' });
+      await expect(caterer.page.getByTestId('reach-form')).toHaveAttribute('data-reach', 'reachSome');
+    } finally {
+      await bistro.close();
+      await caterer.close();
+    }
+  });
+});
+
 test.describe('speculative orders: open RFQ', () => {
   test('ask → producers are told → bid → accept → confirmed order and new supply', async ({ browser, request }) => {
     const s = newSession();

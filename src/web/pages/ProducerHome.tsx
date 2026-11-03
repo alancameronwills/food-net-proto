@@ -11,12 +11,15 @@ import { useScreen } from '../screen';
 import { DemandBoard } from './DemandBoard';
 import { ExtraDays } from './ExtraDays';
 import { OrdersInbox } from './OrdersInbox';
-import { StockCard } from './StockEditor';
+import { StockTable } from './StockEditor';
+import { StockCard } from './StockCards';
 
 export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Bootstrap; reloadBoot: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'stock' | 'listings' | 'orders' | 'demand'>('stock');
   useScreen(`producer/${tab}`);
+  const [layout, setLayoutState] = useState<'table' | 'cards'>(() => localStorage.getItem('stockLayout') === 'cards' ? 'cards' : 'table');
+  const setLayout = (l: 'table' | 'cards') => { setLayoutState(l); localStorage.setItem('stockLayout', l); };
   const { data: windows = [], reload: reloadWindows } = useWindows();
   const { data: orders = [], reload: reloadOrders } = useOrders();
   const { data: requests = [], reload: reloadRequests } = useRequests();
@@ -66,12 +69,23 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
           <OrdersInbox orders={orders} boot={boot} reload={reload} producerId={me.id} />
         </div>
       ) : tab === 'stock' ? (
-        <div className="space-y-4">
-          {mine.length === 0 && <p className="text-slate-600">{t('noListings')}</p>}
-          {mine.map((l) => (
-            <StockCard key={l.id} listing={l} product={products.get(l.productId)!} config={boot.config} reload={reload}
-              windows={myWindows.filter((w) => w.listingId === l.id)} />
-          ))}
+        <div>
+          <div className="mb-2 flex items-center justify-end gap-2 text-sm text-slate-600">
+            <span id="stock-layout-label">{t('stockLayout')}</span>
+            <div role="group" aria-labelledby="stock-layout-label" className="inline-flex overflow-hidden rounded border border-brand">
+              {(['table', 'cards'] as const).map((l) => (
+                <button key={l} aria-pressed={layout === l} onClick={() => setLayout(l)}
+                  className={`px-3 py-1 font-medium ${layout === l ? 'bg-brand text-white' : 'text-brand hover:bg-brand-light'}`}>{t(l === 'table' ? 'layoutTable' : 'layoutCards')}</button>
+              ))}
+            </div>
+          </div>
+          {mine.length === 0 ? <p className="text-slate-600">{t('noListings')}</p>
+            : layout === 'table'
+              ? <StockTable listings={mine} products={products} windows={myWindows} config={boot.config} reload={reload} />
+              : <div className="space-y-4">{mine.map((l) => (
+                <StockCard key={l.id} listing={l} product={products.get(l.productId)!} config={boot.config} reload={reload}
+                  windows={myWindows.filter((w) => w.listingId === l.id)} />
+              ))}</div>}
         </div>
       ) : (
         <ListingsEditor producerId={me.id} boot={boot} reload={reload} />

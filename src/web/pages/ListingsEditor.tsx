@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { capabilities } from '../../shared/models';
-import type { Listing, Product } from '../../shared/types';
+import type { Category, Listing, Product, Unit } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
 import { shelfLifeFor } from '../../shared/availability';
 import { duration } from '../format';
 import { loc } from '../i18n';
 
+const NEW = '__new';
+const UNITS: Unit[] = ['litre', 'kg', 'dozen', 'loaf', 'each', 'crate'];
 type Tier = { minQty: string; price: string };
 const toTiers = (l?: Listing): Tier[] => (l?.tiers ?? []).map((x) => ({ minQty: String(x.minQty), price: String(x.price) }));
 const input = 'rounded border border-slate-300 bg-white px-2 py-1';
@@ -57,7 +59,7 @@ export function ListingsEditor({ producerId, boot, reload }: { producerId: strin
         <ListingForm products={available} tiersOn={tiersOn} categories={boot.categories} onCancel={() => setAdding(false)}
           onSubmit={async (b) => { if (await run(() => api('/listings', { method: 'POST', body: JSON.stringify(b) }))) setAdding(false); }} />
       ) : (
-        <button disabled={available.length === 0} className="rounded bg-gold px-4 py-2 font-semibold text-brand-dark disabled:opacity-50" onClick={() => setAdding(true)}>
+        <button className="rounded bg-gold px-4 py-2 font-semibold text-brand-dark" onClick={() => setAdding(true)}>
           {t('addListing')}
         </button>
       )}
@@ -66,7 +68,7 @@ export function ListingsEditor({ producerId, boot, reload }: { producerId: strin
 }
 
 function ListingForm({ product, products, listing, tiersOn, defaultShelf, categories, onSubmit, onCancel }: {
-  product?: Product; products?: Product[]; listing?: Listing; tiersOn: boolean; defaultShelf?: number; categories?: { id: string; shelfLifeDays: number }[];
+  product?: Product; products?: Product[]; listing?: Listing; tiersOn: boolean; defaultShelf?: number; categories?: Category[];
   onSubmit: (body: Record<string, unknown>) => void; onCancel: () => void;
 }) {
   const { t } = useTranslation();
@@ -75,12 +77,17 @@ function ListingForm({ product, products, listing, tiersOn, defaultShelf, catego
   const [minOrder, setMinOrder] = useState(listing ? String(listing.minOrder) : '1');
   const [tiers, setTiers] = useState<Tier[]>(toTiers(listing));
   const [shelf, setShelf] = useState(listing?.shelfLifeDays !== undefined ? String(listing.shelfLifeDays) : '');
-  const chosen = product ?? products?.find((p) => p.id === productId);
+  const creating = !product && productId === NEW;
+  const [newName, setNewName] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newUnit, setNewUnit] = useState<Unit>('each');
+  const chosen = creating ? { unit: newUnit, category: newCategory } : product ?? products?.find((p) => p.id === productId);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const body: Record<string, unknown> = { pricePerUnit: Number(price), minOrder: Number(minOrder) };
-    if (!listing) body.productId = productId;
+    if (!listing && creating) body.newProduct = { name: newName, category: newCategory, unit: newUnit };
+    else if (!listing) body.productId = productId;
     // Blank means "use the usual for this kind of product"
     if (shelf.trim() !== '') body.shelfLifeDays = Number(shelf); else if (listing) body.shelfLifeDays = null;
     if (tiersOn || listing?.tiers) body.tiers = tiers.filter((x) => x.minQty && x.price).map((x) => ({ minQty: Number(x.minQty), price: Number(x.price) }));
@@ -90,10 +97,31 @@ function ListingForm({ product, products, listing, tiersOn, defaultShelf, catego
   return (
     <form onSubmit={submit} className="space-y-3 rounded-lg border-2 border-brand bg-brand-light p-4">
       {product ? <h3 className="text-lg font-semibold">{loc(product.name)}</h3> : (
-        <select required value={productId} onChange={(e) => setProductId(e.target.value)} className={`${input} w-full sm:w-80`} aria-label={t('product')}>
-          <option value="">{t('chooseProduct')}</option>
-          {products?.map((p) => <option key={p.id} value={p.id}>{loc(p.name)}</option>)}
-        </select>
+        <>
+          <select required value={productId} onChange={(e) => setProductId(e.target.value)} className={`${input} w-full sm:w-80`} aria-label={t('product')}>
+            <option value="">{t('chooseProduct')}</option>
+            {products?.map((p) => <option key={p.id} value={p.id}>{loc(p.name)}</option>)}
+            <option value={NEW}>{t('newProductOption')}</option>
+          </select>
+          {creating && (
+            <div className="flex flex-wrap gap-4 rounded border border-dashed border-brand p-3">
+              <label className="text-sm">{t('newProductName')}
+                <input required maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} className={`${input} ml-2 w-56`} />
+              </label>
+              <label className="text-sm">{t('newProductCategory')}
+                <select required value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className={`${input} ml-2`}>
+                  <option value="">{t('chooseProduct')}</option>
+                  {categories?.map((c) => <option key={c.id} value={c.id}>{loc(c.name)}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">{t('newProductUnit')}
+                <select value={newUnit} onChange={(e) => setNewUnit(e.target.value as Unit)} className={`${input} ml-2`}>
+                  {UNITS.map((u) => <option key={u} value={u}>{t(`units.${u}`)}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+        </>
       )}
       <div className="flex flex-wrap gap-4">
         <label className="text-sm">{t('pricePerUnitLabel')}

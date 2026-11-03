@@ -6,6 +6,7 @@ import { availableForUse, deliverableDates, shelfLifeFor } from '../../shared/av
 import { bidFit, isSpecialDelivery, requestDateNote } from '../delivery-info';
 import { duration, shortDate } from '../format';
 import { nextWeekday } from '../../shared/orders';
+import { localStatus } from '../../shared/models';
 import type { RequestView, SupplyWindow } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
 import { loc } from '../i18n';
@@ -15,6 +16,37 @@ import { TrustChip } from './TrustChip';
 const input = 'rounded border border-slate-300 bg-white px-2 py-1';
 const STATUS: Record<string, string> = { open: 'bg-gold-light text-amber-900', filled: 'bg-emerald-100 text-emerald-800', closed: 'bg-slate-200 text-slate-700' };
 const BID_STATUS: Record<string, string> = { open: 'text-amber-800', accepted: 'font-semibold text-emerald-800', rejected: 'text-slate-500', withdrawn: 'text-slate-500' };
+
+/** Who can see a request for this product: producers within the local range, and how many of those already sell it. */
+function reachOf(boot: Bootstrap, buyerId: string, productId: string) {
+  const product = boot.products.find((p) => p.id === productId);
+  const category = product && boot.categories.find((c) => c.id === product.category);
+  if (!product || !category) return { seen: 0, sellers: 0, sellersAnywhere: 0 };
+  const near = (producerId: string) => {
+    const km = boot.distances[buyerId]?.[producerId];
+    return km !== undefined && localStatus(boot.config, category.maxDriveKm, km) !== 'hidden';
+  };
+  const producers = boot.orgs.filter((o) => o.role === 'producer');
+  const sells = (producerId: string) => boot.listings.some((l) => l.producerId === producerId && l.productId === productId);
+  return {
+    seen: producers.filter((o) => near(o.id)).length,
+    sellers: producers.filter((o) => near(o.id) && sells(o.id)).length,
+    sellersAnywhere: producers.filter((o) => sells(o.id)).length,
+  };
+}
+
+function ReachNote({ boot, buyerId, productId, testId }: { boot: Bootstrap; buyerId: string; productId: string; testId: string }) {
+  const { t } = useTranslation();
+  const r = reachOf(boot, buyerId, productId);
+  const none = r.seen === 0;
+  const key = none ? 'reachNone' : r.sellers === 0 ? 'reachNoSellers' : 'reachSome';
+  const warn = none || r.sellers === 0;
+  return (
+    <p data-testid={testId} data-reach={key} className={`rounded p-2 text-sm ${warn ? 'bg-amber-50 text-amber-900' : 'bg-slate-50 text-slate-700'}`}>
+      {t(key, { seen: r.seen, sellers: r.sellers, anywhere: r.sellersAnywhere })}
+    </p>
+  );
+}
 
 /** A buyer asks for something that is not listed yet, then chooses among the bids. */
 export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrowse }: {
@@ -93,6 +125,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
             {t(dateNote.kind === 'short' ? 'dateNoteShort' : 'dateNoteUnusual', { product: product ? loc(product.name) : '', date: shortDate(date, i18n.language), n: dateNote.days })}
           </p>
         )}
+        {product && <ReachNote boot={boot} buyerId={buyerId} productId={product.id} testId="reach-form" />}
         {already > 0 && (
           <p data-testid="already-available" className="rounded bg-emerald-50 p-2 text-sm text-emerald-900">
             {t('reqAlready', { n: already })}{' '}
@@ -126,6 +159,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                 {r.pool && <p data-testid="pool-note" className="mt-1 rounded bg-brand-light px-2 py-1 text-sm text-brand">{t('pooledWith', { qty: r.pool.totalQty, n: r.pool.buyers })}</p>}
                 {r.note && <p className="mt-1 text-sm italic text-slate-600">“{r.note}”</p>}
 
+                {r.status === 'open' && <div className="mt-2"><ReachNote boot={boot} buyerId={buyerId} productId={r.productId} testId="reach-request" /></div>}
                 {r.bids.length === 0 && r.status === 'open' && (
                   <p className="mt-2 text-sm text-slate-600">{model === 'first_accept' && r.targetPrice !== undefined ? t('waitingTake', { price: r.targetPrice.toFixed(2) }) : t('waitingBids')}</p>
                 )}

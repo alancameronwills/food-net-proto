@@ -183,7 +183,8 @@ test.describe('supply cuts', () => {
     try {
       // Cut the forecast to provisional: 80 units already promised no longer have a firm supply
       const cell = producer.page.getByTestId(`stock-${MILK}`).getByTestId(`week-${mondayOf(FORECAST_DAY)}`);
-      await cell.getByRole('combobox').selectOption('provisional');
+      await cell.getByRole('button', { name: /Confidence/ }).click(); // forecast -> in stock
+      await cell.getByRole('button', { name: /Confidence/ }).click(); // -> provisional
       await expect(producer.page.getByTestId('cut-warning')).toContainText('2 order(s) no longer fit');
 
       await buyer.page.getByRole('tab', { name: /My orders/ }).click();

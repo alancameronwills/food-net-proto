@@ -16,17 +16,21 @@ export type Bootstrap = {
 };
 
 const params = new URLSearchParams(location.search);
-// Session and persona live in the URL so role links can be shared; fall back to the last values used.
+// Session and persona belong to this browser tab, so several tabs can play different roles at once: a link (?s=, ?as=) wins,
+// then what this tab already chose (kept across a refresh), then what was used last in any tab (for a brand-new tab).
+const remembered = (key: string) => sessionStorage.getItem(key) ?? localStorage.getItem(key);
 export const ctx = {
-  session: params.get('s') ?? localStorage.getItem('session') ?? 'default',
-  persona: params.get('as') ?? localStorage.getItem('persona') ?? '',
+  session: params.get('s') ?? remembered('session') ?? 'default',
+  persona: params.get('as') ?? remembered('persona') ?? '',
 };
+sessionStorage.setItem('session', ctx.session);
 localStorage.setItem('session', ctx.session);
-if (ctx.persona) localStorage.setItem('persona', ctx.persona);
+if (ctx.persona) { sessionStorage.setItem('persona', ctx.persona); localStorage.setItem('persona', ctx.persona); }
 
 export function setPersona(id: string) {
   ctx.persona = id;
-  if (id) localStorage.setItem('persona', id); else localStorage.removeItem('persona');
+  if (id) { sessionStorage.setItem('persona', id); localStorage.setItem('persona', id); }
+  else { sessionStorage.setItem('persona', ''); localStorage.removeItem('persona'); }
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
