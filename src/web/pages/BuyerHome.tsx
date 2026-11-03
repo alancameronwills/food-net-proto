@@ -56,7 +56,7 @@ export function BuyerHome({ me, boot }: { me: Persona; boot: Bootstrap }) {
         <Planner buyerId={me.id} boot={boot} windows={windows} onPick={(date, name) => { setUseOn(date); setSearch(name); setTab('browse'); }} />
       )}
       {tab === 'requests' && (capabilities(boot.config).showDemandBoard ? (
-        <RequestsBuyer buyerId={me.id} boot={boot} windows={windows} requests={requests} reload={() => { reloadRequests(); reloadOrders(); reloadWindows(); }}
+        <RequestsBuyer buyerId={me.id} boot={boot} windows={windows} requests={requests} reload={() => Promise.all([reloadRequests(), reloadOrders(), reloadWindows()])}
           onBrowse={(date, name) => { setUseOn(date); setSearch(name); setTab('browse'); }} />
       ) : <p className="text-slate-600">{t('commitmentsSoon')}</p>)}
       {tab === 'orders' && (

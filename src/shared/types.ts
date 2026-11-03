@@ -159,6 +159,8 @@ export type DemandRequest = {
 /** What a screen receives: bids are filtered by who is asking, and pooled demand is summarised. */
 export type RequestView = Omit<DemandRequest, 'version'> & {
   bidCount: number;
+  /** Still open, but its delivery day has gone: it can no longer be bid on or accepted, only closed */
+  expired?: boolean;
   pool?: { totalQty: number; requests: number; buyers: number };
 };
 

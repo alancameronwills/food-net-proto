@@ -36,4 +36,7 @@ Commit messages end with the Co-Authored-By line given in the session's attribut
 - Reset takes a lock and marks the session `resetting`; readers wait. First seeding of a session also takes a lock.
 - Delivery rules, shelf life and special deliveries: `src/shared/delivery.ts`, `availability.ts`. Requests accept any future date; producers may bid with their own date.
   A request's product may be `OTHER_PRODUCT` ("something else", note required, widest local range, never pooled); a bid carries `productId` (what is offered, defaults to the product asked for) and the order is for that.
+  An open request whose day has passed is `expired` (view flag): out of pools and producers' lists, no bids or accepts, the buyer can still close it.
+  With demand switched off, new requests, bids and accepts stop (409), and every screen hides demand; the API still lets a buyer close their request and a producer withdraw their bid.
+  Resending a pooled bid replaces the producer's open bids; ones it no longer covers are withdrawn (`bid_withdrawn`). The listing for an offered item is made in the accepting transaction.
 - Welsh text is machine-translated (`src/web/i18n.ts`); keep both languages in step.

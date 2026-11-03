@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { offersFor } from '../../shared/browse';
 import { addDays, todayIso } from '../../shared/dates';
@@ -52,7 +52,7 @@ function ReachNote({ boot, buyerId, productId, testId }: { boot: Bootstrap; buye
 
 /** A buyer asks for something that is not listed yet, then chooses among the bids. */
 export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrowse }: {
-  buyerId: string; boot: Bootstrap; windows: SupplyWindow[]; requests: RequestView[]; reload: () => void;
+  buyerId: string; boot: Bootstrap; windows: SupplyWindow[]; requests: RequestView[]; reload: () => unknown;
   onBrowse: (date: string, productName: string) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -68,8 +68,14 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
   const else_ = isOther(productId);
   const dateNote = product ? requestDateNote(boot, product.id, date) : undefined;
 
-  const run = async (f: () => Promise<unknown>) => {
-    try { setError(''); await f(); reload(); return true; } catch (e) { setError((e as Error).message); return false; }
+  // One action at a time (a double click must not send twice), and look again after a failure: what the buyer saw may be stale
+  const acting = useRef(new Set<string>());
+  const [working, setWorking] = useState<string[]>([]);
+  const run = async (key: string, f: () => Promise<unknown>) => {
+    if (acting.current.has(key)) return false; // already on its way: the buttons are off, so this is only a double click
+    acting.current.add(key); setWorking([...acting.current]);
+    try { setError(''); await f(); await reload(); return true; } catch (e) { setError((e as Error).message); await reload(); return false; }
+    finally { acting.current.delete(key); setWorking([...acting.current]); }
   };
 
   // Is what they want already on sale? Then Browse is quicker than waiting for bids.
@@ -88,7 +94,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const ok = await run(() => api('/requests', { method: 'POST', body: JSON.stringify({
+    const ok = await run('new', () => api('/requests', { method: 'POST', body: JSON.stringify({
       productId, qty: Number(qty), deliveryDate: date, targetPrice: target ? Number(target) : undefined, note: note.trim() || undefined }) }));
     setBusy(false);
     if (ok) { setQty(''); setTarget(''); setNote(''); }
@@ -138,7 +144,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
           </p>
         )}
         {error && <p role="alert" className="rounded bg-red-100 p-2 text-sm text-red-800">{error}</p>}
-        <button disabled={busy} className="w-full rounded bg-brand py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-50">{t('reqSend')}</button>
+        <button disabled={busy || working.includes('new')} className="w-full rounded bg-brand py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-50">{t('reqSend')}</button>
       </form>
 
       <section>
@@ -164,8 +170,9 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                 {r.pool && <p data-testid="pool-note" className="mt-1 rounded bg-brand-light px-2 py-1 text-sm text-brand">{t('pooledWith', { qty: r.pool.totalQty, n: r.pool.buyers })}</p>}
                 {r.note && <p className="mt-1 text-sm italic text-slate-600">“{r.note}”</p>}
 
+                {r.expired && <p data-testid="request-expired" className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-900">{t('reqExpired')}</p>}
                 {r.status === 'open' && !isOther(r.productId) && <div className="mt-2"><ReachNote boot={boot} buyerId={buyerId} productId={r.productId} testId="reach-request" /></div>}
-                {r.bids.length === 0 && r.status === 'open' && (
+                {r.bids.length === 0 && r.status === 'open' && !r.expired && (
                   <p className="mt-2 text-sm text-slate-600">{model === 'first_accept' && r.targetPrice !== undefined ? t('waitingTake', { price: r.targetPrice.toFixed(2) }) : t('waitingBids')}</p>
                 )}
                 {r.bids.length > 0 && (
@@ -175,7 +182,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                     </thead>
                     <tbody>
                       {[...r.bids].sort((a, b) => a.price - b.price).map((b) => {
-                        const org = boot.orgs.find((o) => o.id === b.producerId)!;
+                        const org = boot.orgs.find((o) => o.id === b.producerId) ?? { name: b.producerId, town: '' };
                         const km = boot.distances[buyerId]?.[b.producerId];
                         return (
                           <tr key={b.id} data-testid={`bid-${r.id}-${b.producerId}`} className="border-t border-slate-100 align-top">
@@ -200,9 +207,9 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                             <td className="py-1 text-slate-600">{b.note}</td>
                             <td className="py-1 text-right">
                               {b.status === 'open' && r.status === 'open' ? (
-                                <button disabled={b.qty > left} title={b.qty > left ? t('onlyN', { n: left }) : undefined}
+                                <button disabled={b.qty > left || working.includes(r.id) || !!r.expired} title={r.expired ? t('outcomeExpired') : b.qty > left ? t('onlyN', { n: left }) : undefined}
                                   className="rounded bg-emerald-700 px-3 py-1 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40"
-                                  onClick={() => run(() => api(`/requests/${r.id}/accept`, { method: 'POST', body: JSON.stringify({ bidId: b.id }) }))}>{t('acceptBid')}</button>
+                                  onClick={() => run(r.id, () => api(`/requests/${r.id}/accept`, { method: 'POST', body: JSON.stringify({ bidId: b.id }) }))}>{t('acceptBid')}</button>
                               ) : (
                                 <span className={BID_STATUS[b.status]}>{t(`bidStatus_${b.status}`)}{b.orderId && ` · ${t('orderMade', { id: b.orderId })}`}</span>
                               )}
@@ -214,8 +221,8 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                   </table>
                 )}
                 {r.status === 'open' && (
-                  <button className="mt-3 text-sm text-red-700 underline"
-                    onClick={() => { if (confirm(t('confirmWithdrawRequest'))) void run(() => api(`/requests/${r.id}/close`, { method: 'POST' })); }}>{t('withdrawRequest')}</button>
+                  <button disabled={working.includes(r.id)} className="mt-3 text-sm text-red-700 underline disabled:opacity-40"
+                    onClick={() => { if (confirm(t('confirmWithdrawRequest'))) void run(r.id, () => api(`/requests/${r.id}/close`, { method: 'POST' })); }}>{t('withdrawRequest')}</button>
                 )}
               </article>
             );

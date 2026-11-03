@@ -14,7 +14,7 @@ import { OrdersInbox } from './OrdersInbox';
 import { StockTable } from './StockEditor';
 import { StockCard } from './StockCards';
 
-export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Bootstrap; reloadBoot: () => void }) {
+export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Bootstrap; reloadBoot: () => unknown }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'stock' | 'listings' | 'orders' | 'demand'>('stock');
   useScreen(`producer/${tab}`);
@@ -23,7 +23,7 @@ export function ProducerHome({ me, boot, reloadBoot }: { me: Persona; boot: Boot
   const { data: windows = [], reload: reloadWindows } = useWindows();
   const { data: orders = [], reload: reloadOrders } = useOrders();
   const { data: requests = [], reload: reloadRequests } = useRequests();
-  const reload = () => { reloadBoot(); reloadWindows(); reloadOrders(); reloadRequests(); };
+  const reload = () => Promise.all([reloadBoot(), reloadWindows(), reloadOrders(), reloadRequests()]);
   // If the operator switches demand requests off while this tab is open, go back to the stock screen
   useEffect(() => { if (!boot.config.demandOn && tab === 'demand') setTab('stock'); }, [boot.config.demandOn, tab]);
   const unanswered = requests.filter((r) => r.status === 'open' && !r.bids.some((b) => b.status === 'open')).length;

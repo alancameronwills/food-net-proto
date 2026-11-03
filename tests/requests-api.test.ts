@@ -1,7 +1,7 @@
 import '../src/server/env-local';
 import { describe, expect, it } from 'vitest';
 import { app } from '../src/server/app';
-import { ensureTable } from '../src/server/db';
+import { ensureTable, session } from '../src/server/db';
 import { addDays, mondayOf, todayIso } from '../src/shared/dates';
 import type { Listing, Order, RequestView, SupplyWindow } from '../src/shared/types';
 
@@ -30,6 +30,7 @@ async function setup(model: Record<string, unknown> = {}) {
   await who(sid, 'operator').put('/config', { localRange: 'flat', flatRadiusKm: 200, ...model });
   return { sid, op: who(sid, 'operator'), as: (id: string) => who(sid, id) };
 }
+const else_ = (extra: Record<string, unknown> = {}) => ({ productId: 'other', qty: 30, deliveryDate: DATE, note: 'Rye flour, stoneground', ...extra });
 const ask = (extra: Record<string, unknown> = {}) => ({ productId: 'milk-whole', qty: 120, deliveryDate: DATE, ...extra });
 
 describe.skipIf(!dbUp)('creating requests', () => {
@@ -269,8 +270,238 @@ describe.skipIf(!dbUp)('pooled demand', () => {
   });
 });
 
+describe.skipIf(!dbUp)('robustness', () => {
+  const dbOf = (sid: string) => session(sid);
+  // The only way to make a request from the past (the API refuses them): change a stored one, the way the app does, checking its version
+  const patchRequest = async (sid: string, id: string, change: (r: any) => object) => {
+    const s = dbOf(sid);
+    const r = await s.get<any>('REQUEST', id);
+    const tx = await s.transact([s.tPut('REQUEST', id, { ...r, ...change(r), version: r.version + 1 }, '#v = :v', { '#v': 'version' }, { ':v': r.version })]);
+    expect(tx.ok).toBe(true);
+  };
+  const setDate = (sid: string, id: string, deliveryDate: string) => patchRequest(sid, id, () => ({ deliveryDate }));
+
+  it('lowering a pooled bid withdraws the larger bids it no longer covers, and tells the buyer', async () => {
+    const { as } = await setup({ speculative: 'pooled' });
+    const ids: string[] = [];
+    for (const buyer of ['corner-deli', 'grand-hotel', 'harbour-bistro']) ids.push((await as(buyer).post('/requests', ask({ qty: 25 }))).body.request.id);
+    expect(((await as('dyfed-dairy').post(`/requests/${ids[0]}/bids`, { price: 0.9, qty: 75 })).body.bids as any[]).map((x) => x.qty)).toEqual([25, 25, 25]);
+    const again = await as('dyfed-dairy').post(`/requests/${ids[0]}/bids`, { price: 0.9, qty: 30 });
+    expect((again.body.bids as any[]).map((x) => x.qty)).toEqual([25, 5]);
+    const last = ((await as('harbour-bistro').get('/requests')).body as RequestView[]).find((r) => r.id === ids[2])!;
+    expect(last.bids.filter((b) => b.status === 'open')).toHaveLength(0);
+    expect(last.bids[0].status).toBe('withdrawn');
+    const told = (await as('harbour-bistro').get('/notifications')).body as { type: string; params: { requestId: string; producer: string } }[];
+    expect(told.some((n) => n.type === 'bid_withdrawn' && n.params.requestId === ids[2] && n.params.producer === 'Dyfed Dairy')).toBe(true);
+  });
+
+  it('a producer sees pool totals only for buyers within their range', async () => {
+    const { as, op } = await setup({ speculative: 'pooled' });
+    const km = ((await as('dyfed-dairy').get('/bootstrap')).body.distances) as Record<string, Record<string, number>>;
+    // A flat radius between the second and third nearest of four buyers, wherever the seed puts them
+    const byDistance = ['corner-deli', 'grand-hotel', 'harbour-bistro', 'castle-caterers'].sort((x, y) => km[x]['dyfed-dairy'] - km[y]['dyfed-dairy']);
+    const [d2, d3] = [km[byDistance[1]]['dyfed-dairy'], km[byDistance[2]]['dyfed-dairy']];
+    expect(d3).toBeGreaterThan(d2); // otherwise the seed has no such split
+    await op.put('/config', { localRange: 'flat', flatRadiusKm: (d2 + d3) / 2 });
+    const ids: string[] = [];
+    for (const b of [byDistance[0], byDistance[1], byDistance[3]]) ids.push((await as(b).post('/requests', ask({ qty: 10 }))).body.request.id);
+    const seen = ((await as('dyfed-dairy').get('/requests')).body as RequestView[]);
+    expect(seen.find((r) => r.id === ids[0])!.pool).toEqual({ totalQty: 20, requests: 2, buyers: 2 });
+    expect(seen.some((r) => r.id === ids[2])).toBe(false);
+  });
+
+  it('accepting stops while demand requests are switched off, but a buyer can still close and a producer withdraw', async () => {
+    const { as, op } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const other = (await as('grand-hotel').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const bid = (await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20 })).body.bids[0];
+    const bid2 = (await as('dyfed-dairy').post(`/requests/${other}/bids`, { price: 0.9, qty: 20 })).body.bids[0];
+    await op.put('/config', { demandOn: false });
+    expect((await as('corner-deli').post(`/requests/${id}/accept`, { bidId: bid.id })).status).toBe(409);
+    expect((await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.8, qty: 20 })).status).toBe(409);
+    expect((await as('grand-hotel').post(`/requests/${id}/close`)).status).toBe(403);
+    expect((await as('brongest-creamery').post(`/requests/${id}/bids/${bid.id}/withdraw`)).status).toBe(403);
+    expect((await as('corner-deli').post('/requests/DR-nope/close')).status).toBe(404);
+    expect((await as('dyfed-dairy').post(`/requests/${id}/bids/${bid.id}/withdraw`)).status).toBe(200);
+    expect((await as('grand-hotel').post(`/requests/${other}/close`)).status).toBe(200);
+    expect((await as('dyfed-dairy').post(`/requests/${other}/bids/${bid2.id}/withdraw`)).status).toBe(409); // closed with it
+    await op.put('/config', { demandOn: true });
+    expect(((await as('corner-deli').get('/requests')).body as RequestView[]).find((r) => r.id === id)!.bids[0].status).toBe('withdrawn');
+  });
+
+  it('withdrawing a bid tells the buyer', async () => {
+    const { as } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const bid = (await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20 })).body.bids[0];
+    await as('dyfed-dairy').post(`/requests/${id}/bids/${bid.id}/withdraw`);
+    const told = (await as('corner-deli').get('/notifications')).body as { type: string; params: { producer: string } }[];
+    expect(told.some((n) => n.type === 'bid_withdrawn' && n.params.producer === 'Dyfed Dairy')).toBe(true);
+  });
+
+  it('sending a pooled bid again unchanged keeps the same bids and tells nobody twice', async () => {
+    const { as } = await setup({ speculative: 'pooled' });
+    const a = (await as('corner-deli').post('/requests', ask({ qty: 25 }))).body.request.id;
+    await as('grand-hotel').post('/requests', ask({ qty: 25 }));
+    const first = (await as('dyfed-dairy').post(`/requests/${a}/bids`, { price: 0.9, qty: 50 })).body.bids as any[];
+    const again = (await as('dyfed-dairy').post(`/requests/${a}/bids`, { price: 0.9, qty: 50 })).body.bids as any[];
+    expect(again.map((b) => b.id)).toEqual(first.map((b) => b.id));
+    const told = (await as('corner-deli').get('/notifications')).body as { type: string }[];
+    expect(told.filter((n) => n.type === 'bid_placed')).toHaveLength(1);
+    const changed = (await as('dyfed-dairy').post(`/requests/${a}/bids`, { price: 0.85, qty: 50 })).body.bids as any[];
+    expect(changed[0].id).not.toBe(first[0].id); // a real change replaces the bid
+  });
+
+  it('a request whose delivery day has passed cannot be bid on or accepted, and drops out of pools and producers lists', async () => {
+    const { sid, as } = await setup({ speculative: 'pooled' });
+    const a = (await as('corner-deli').post('/requests', ask({ qty: 40 }))).body.request.id;
+    const b = (await as('grand-hotel').post('/requests', ask({ qty: 40 }))).body.request.id;
+    const bid = (await as('dyfed-dairy').post(`/requests/${a}/bids`, { price: 0.9, qty: 40 })).body.bids[0];
+    await setDate(sid, a, addDays(todayIso(), -1));
+
+    const buyerView = ((await as('corner-deli').get('/requests')).body as RequestView[]).find((r) => r.id === a)!;
+    expect(buyerView).toMatchObject({ status: 'open', expired: true });
+    expect(buyerView.pool).toBeUndefined();
+    expect(((await as('brongest-creamery').get('/requests')).body as RequestView[]).map((r) => r.id)).toEqual([b]); // gone from lists...
+    expect(((await as('dyfed-dairy').get('/requests')).body as RequestView[]).find((r) => r.id === a)!.expired).toBe(true); // ...but kept for who bid
+    expect(((await as('brongest-creamery').get('/requests')).body as RequestView[])[0].pool).toBeUndefined(); // b is alone now
+
+    const late = await as('brongest-creamery').post(`/requests/${a}/bids`, { price: 1, qty: 10, deliveryDate: addDays(todayIso(), 30) });
+    expect(late.status).toBe(409);
+    expect(late.body.error).toMatch(/passed/);
+    const acc = await as('corner-deli').post(`/requests/${a}/accept`, { bidId: bid.id });
+    expect(acc.status).toBe(409);
+    expect(acc.body.error).toMatch(/passed/);
+    expect((await as('corner-deli').post(`/requests/${a}/close`)).status).toBe(200); // the buyer can still tidy it away
+  });
+
+  it('a bid with its own future day cannot be accepted once the request has expired, but its producer can still withdraw it', async () => {
+    const { sid, as } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const bid = (await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20, deliveryDate: addDays(todayIso(), 10) })).body.bids[0];
+    await setDate(sid, id, addDays(todayIso(), -1));
+    const acc = await as('corner-deli').post(`/requests/${id}/accept`, { bidId: bid.id });
+    expect(acc.status).toBe(409);
+    expect(acc.body.error).toMatch(/passed/);
+    expect((await as('dyfed-dairy').post(`/requests/${id}/bids/${bid.id}/withdraw`)).status).toBe(200);
+  });
+
+  it('a producer resending on a request that has expired is refused, and the stale bid is withdrawn', async () => {
+    const { sid, as } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id;
+    await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20 });
+    await setDate(sid, id, addDays(todayIso(), -1));
+    expect((await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.8, qty: 20 })).status).toBe(409);
+    const view = ((await as('corner-deli').get('/requests')).body as RequestView[]).find((r) => r.id === id)!;
+    expect(view.bids.map((b) => b.status)).toEqual(['withdrawn']);
+    const told = (await as('corner-deli').get('/notifications')).body as { type: string }[];
+    expect(told.some((n) => n.type === 'bid_withdrawn')).toBe(true);
+  });
+
+  it('a new pooled bid leaves alone a bid of theirs on an expired request in another pool, and says so when only some of it got in', async () => {
+    const { sid, as } = await setup({ speculative: 'pooled' });
+    const old = (await as('corner-deli').post('/requests', ask({ qty: 25 }))).body.request.id;
+    await as('dyfed-dairy').post(`/requests/${old}/bids`, { price: 0.9, qty: 25 });
+    await setDate(sid, old, addDays(todayIso(), -10)); // an earlier week's pool
+    const fresh = (await as('grand-hotel').post('/requests', ask({ qty: 25, deliveryDate: DATE2 }))).body.request.id;
+    expect((await as('dyfed-dairy').post(`/requests/${fresh}/bids`, { price: 0.9, qty: 25 })).status).toBe(200);
+    const view = ((await as('corner-deli').get('/requests')).body as RequestView[]).find((r) => r.id === old)!;
+    expect(view.bids.map((b) => b.status)).toEqual(['open']); // not this bid's business: the producer can withdraw it
+    const told = (await as('corner-deli').get('/notifications')).body as { type: string }[];
+    expect(told.some((n) => n.type === 'bid_withdrawn')).toBe(false);
+  });
+
+  it('refusals do not use up order numbers, and a bid-day refusal does not advise a later date for the request', async () => {
+    const { sid, as } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const bid = (await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20 })).body.bids[0];
+    const id2 = (await as('grand-hotel').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const bid2 = (await as('dyfed-dairy').post(`/requests/${id2}/bids`, { price: 0.9, qty: 20 })).body.bids[0];
+    await setDate(sid, id, addDays(todayIso(), -1));
+    const refused = await as('corner-deli').post(`/requests/${id}/accept`, { bidId: bid.id });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).not.toMatch(/later date/);
+    const first = (await as('grand-hotel').post(`/requests/${id2}/accept`, { bidId: bid2.id })).body.order.id as string;
+    const id3 = (await as('castle-caterers').post('/requests', ask({ qty: 10 }))).body.request.id;
+    const bid3 = (await as('dyfed-dairy').post(`/requests/${id3}/bids`, { price: 0.9, qty: 10 })).body.bids[0];
+    const second = (await as('castle-caterers').post(`/requests/${id3}/accept`, { bidId: bid3.id })).body.order.id as string;
+    expect(Number(second.slice(3)) - Number(first.slice(3))).toBe(1); // no gap left by the refusal
+  });
+
+  it('the operator cannot send the config an array either', async () => {
+    const { op } = await setup();
+    expect((await op.put('/config', [{ demandOn: false }])).status).toBe(400);
+    expect((await op.get('/config')).body.demandOn).toBe(true);
+  });
+
+  it('health answers with no session and does not make one', async () => {
+    const res = await app.request('/api/health', { headers: { 'x-session': 'NOT a valid id!' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect((await app.request('/api/personas', { headers: { 'x-session': 'NOT a valid id!' } })).status).toBe(400); // the guard is still there for the rest
+  });
+
+  // Needs a day this week still ahead (so the pool is this week's): not possible on a Sunday
+  const tomorrow = addDays(todayIso(), 1);
+  it.skipIf(mondayOf(tomorrow) !== MONDAY)('resending a pooled bid withdraws the earlier bid on a pool member that has since expired', async () => {
+    const { sid, as } = await setup({ speculative: 'pooled' });
+    const ids: string[] = [];
+    for (const buyer of ['corner-deli', 'grand-hotel', 'harbour-bistro']) ids.push((await as(buyer).post('/requests', ask({ qty: 25, deliveryDate: tomorrow }))).body.request.id);
+    await as('dyfed-dairy').post(`/requests/${ids[0]}/bids`, { price: 0.9, qty: 75 });
+    await setDate(sid, ids[0], MONDAY); // this week's Monday: no longer ahead, but still the same pool
+    const again = await as('dyfed-dairy').post(`/requests/${ids[1]}/bids`, { price: 0.9, qty: 30 });
+    expect((again.body.bids as any[]).map((b) => b.qty)).toEqual([25, 5]);
+    const old = ((await as('corner-deli').get('/requests')).body as RequestView[]).find((r) => r.id === ids[0])!;
+    expect(old.bids.filter((b) => b.status === 'open')).toHaveLength(0);
+  });
+
+  it('a bid whose own day has passed cannot be accepted', async () => {
+    const { sid, as } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const bid = (await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20, deliveryDate: addDays(todayIso(), 2) })).body.bids[0];
+    await patchRequest(sid, id, (r) => ({ bids: r.bids.map((x: any) => ({ ...x, deliveryDate: todayIso() })) }));
+    expect((await as('corner-deli').post(`/requests/${id}/accept`, { bidId: bid.id })).status).toBe(409);
+    // and the producer, left with the same bid, is not stuck: sending it again without a date falls back to the day asked for
+    expect((await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20 })).status).toBe(200);
+  });
+
+  it('accepting makes the listing together with the order, and only when the producer has none', async () => {
+    const { sid, as } = await setup();
+    const id = (await as('corner-deli').post('/requests', else_({ qty: 6 }))).body.request.id;
+    expect(await dbOf(sid).get('LISTING', 'nevern-bakery:cheese-blue')).toBeUndefined();
+    const bid = (await as('nevern-bakery').post(`/requests/${id}/bids`, { price: 16, qty: 6, productId: 'cheese-blue' })).body.bids[0];
+    expect((await as('corner-deli').post(`/requests/${id}/accept`, { bidId: bid.id })).status).toBe(200);
+    expect(await dbOf(sid).get('LISTING', 'nevern-bakery:cheese-blue')).toMatchObject({ pricePerUnit: 16 });
+    // A producer who already sells the item keeps their own listing
+    const id2 = (await as('corner-deli').post('/requests', ask({ qty: 10 }))).body.request.id;
+    const bid2 = (await as('dyfed-dairy').post(`/requests/${id2}/bids`, { price: 0.5, qty: 10 })).body.bids[0];
+    await as('corner-deli').post(`/requests/${id2}/accept`, { bidId: bid2.id });
+    expect(await dbOf(sid).get('LISTING', 'dyfed-dairy:milk-whole')).toMatchObject({ pricePerUnit: 0.95 });
+  });
+
+  it('with no product categories, requests are refused clearly instead of failing', async () => {
+    const { sid, as } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id;
+    const s = dbOf(sid);
+    for (const c of await s.list<{ id: string }>('CATEGORY')) await s.remove('CATEGORY', c.id);
+    const made = await as('corner-deli').post('/requests', ask());
+    expect(made.status).toBe(409);
+    expect(made.body.error).toMatch(/categories/);
+    expect((await as('corner-deli').post('/requests', else_())).status).toBe(409);
+    expect((await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 1, qty: 5 })).status).toBe(409);
+    expect((await as('dyfed-dairy').get('/requests')).status).toBe(200);
+    expect(((await as('dyfed-dairy').get('/requests')).body as RequestView[])).toHaveLength(0); // nobody is in range of nothing
+  });
+
+  it('odd paths and bodies get proper API errors, not a 500', async () => {
+    const { as } = await setup();
+    expect((await as('dyfed-dairy').put('/listings/health', { price: 1 })).status).toBe(404);
+    const res = await app.request('/api/requests', { method: 'POST', headers: { 'x-session': newSession(), 'x-persona': 'corner-deli', 'content-type': 'application/json' }, body: '[1]' });
+    expect(res.status).toBe(400); // an array is no body at all: the first thing missing is named
+    expect((await res.json()).error).toMatch(/Unknown product/);
+  });
+});
+
 describe.skipIf(!dbUp)('something else, and offering something other than what was asked for', () => {
-  const else_ = (extra: Record<string, unknown> = {}) => ({ productId: 'other', qty: 30, deliveryDate: DATE, note: 'Rye flour, stoneground', ...extra });
 
   it('needs a note saying what is wanted, and every producer in the widest range can see it', async () => {
     const { as } = await setup({ localRange: 'category' });

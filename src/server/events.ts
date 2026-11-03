@@ -8,7 +8,7 @@ import type { Session } from './db';
 export type EventType =
   | 'order_placed' | 'order_confirmed' | 'order_declined' | 'order_cancelled'
   | 'order_picked' | 'order_delivered' | 'order_short' | 'supply_cut'
-  | 'request_new' | 'request_closed' | 'bid_placed' | 'bid_accepted' | 'bid_rejected' | 'request_filled';
+  | 'request_new' | 'request_closed' | 'bid_placed' | 'bid_accepted' | 'bid_rejected' | 'bid_withdrawn' | 'request_filled';
 
 export type EventParams = {
   orderId?: string; requestId?: string;

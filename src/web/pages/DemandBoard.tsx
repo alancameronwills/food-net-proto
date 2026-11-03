@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { addDays, todayIso } from '../../shared/dates';
 import { useTranslation } from 'react-i18next';
 import type { Bid, RequestView } from '../../shared/types';
@@ -12,15 +12,23 @@ import { longDate } from './Browse';
 const input = 'rounded border border-slate-300 bg-white px-2 py-1';
 
 /** What local buyers are asking for. Producers bid (sealed), or accept the buyer's price under first-to-accept. */
-export function DemandBoard({ producerId, boot, requests, reload }: { producerId: string; boot: Bootstrap; requests: RequestView[]; reload: () => void }) {
+export function DemandBoard({ producerId, boot, requests, reload }: { producerId: string; boot: Bootstrap; requests: RequestView[]; reload: () => unknown }) {
   const { t, i18n } = useTranslation();
   const [error, setError] = useState('');
   const model = boot.config.speculative;
-  const open = requests.filter((r) => r.status === 'open');
-  const decided = requests.filter((r) => r.status !== 'open');
+  // A request whose day has passed is out of the running, unless this producer still has a bid on it to withdraw
+  const live = (r: RequestView) => r.status === 'open' && (!r.expired || r.bids.some((b) => b.status === 'open'));
+  const open = requests.filter(live);
+  const decided = requests.filter((r) => !live(r));
 
-  const run = async (f: () => Promise<unknown>) => {
-    try { setError(''); await f(); reload(); return true; } catch (e) { setError((e as Error).message); reload(); return false; }
+  // One action at a time for each request, held until the screen has been refreshed: a double click must not send twice
+  const acting = useRef(new Set<string>());
+  const [working, setWorking] = useState<string[]>([]);
+  const run = async (key: string, f: () => Promise<unknown>) => {
+    if (acting.current.has(key)) return false;
+    acting.current.add(key); setWorking([...acting.current]);
+    try { setError(''); await f(); await reload(); return true; } catch (e) { setError((e as Error).message); await reload(); return false; }
+    finally { acting.current.delete(key); setWorking([...acting.current]); }
   };
 
   return (
@@ -28,7 +36,7 @@ export function DemandBoard({ producerId, boot, requests, reload }: { producerId
       <p className="text-slate-600">{t('demandIntro')}</p>
       {error && <p role="alert" className="rounded bg-red-100 p-2 text-sm text-red-800">{error}</p>}
       {open.length === 0 && <p className="text-slate-600">{t('demandNone')}</p>}
-      {open.map((r) => <RequestCard key={r.id} r={r} boot={boot} producerId={producerId} model={model} run={run} lang={i18n.language} />)}
+      {open.map((r) => <RequestCard key={r.id} r={r} boot={boot} producerId={producerId} model={model} run={(f) => run(r.id, f)} working={working.includes(r.id)} lang={i18n.language} />)}
 
       {decided.length > 0 && (
         <section className="space-y-2 pt-2">
@@ -42,7 +50,7 @@ export function DemandBoard({ producerId, boot, requests, reload }: { producerId
                 <span>{asked.name} · {r.qty} {asked.unit}</span>
                 <span className="text-slate-500">{longDate(r.deliveryDate, i18n.language)}</span>
                 <span className={`ml-auto font-semibold ${mine?.status === 'accepted' ? 'text-emerald-800' : 'text-slate-500'}`}>
-                  {mine?.status === 'accepted' ? t('outcomeWon', { id: mine.orderId }) : r.status === 'closed' ? t('outcomeClosed') : t('outcomeLost')}
+                  {mine?.status === 'accepted' ? t('outcomeWon', { id: mine.orderId }) : r.expired ? t('outcomeExpired') : r.status === 'closed' ? t('outcomeClosed') : t('outcomeLost')}
                 </span>
               </div>
             );
@@ -53,12 +61,12 @@ export function DemandBoard({ producerId, boot, requests, reload }: { producerId
   );
 }
 
-function RequestCard({ r, boot, producerId, model, run, lang }: {
-  r: RequestView; boot: Bootstrap; producerId: string; model: string; run: (f: () => Promise<unknown>) => Promise<boolean>; lang: string;
+function RequestCard({ r, boot, producerId, model, run, working, lang }: {
+  r: RequestView; boot: Bootstrap; producerId: string; model: string; run: (f: () => Promise<unknown>) => Promise<boolean>; working: boolean; lang: string;
 }) {
   const { t } = useTranslation();
   const asked = requestedAs(boot, r.productId, t);
-  const buyer = boot.orgs.find((o) => o.id === r.buyerId)!;
+  const buyer = boot.orgs.find((o) => o.id === r.buyerId) ?? { name: r.buyerId, town: '' };
   const km = boot.distances[r.buyerId]?.[producerId];
   const mine: Bid | undefined = r.bids.find((b) => b.producerId === producerId && b.status === 'open');
   // What is offered: the item asked for if this producer has it, else they must choose (always from their own products,
@@ -82,7 +90,9 @@ function RequestCard({ r, boot, producerId, model, run, lang }: {
   const [note, setNote] = useState(mine?.note ?? '');
   // The day offered: the day asked for unless the producer changes it (left alone, so pooled requests keep their own days)
   const [dayEdit, setDay] = useState<string>();
-  const offeredDay = dayEdit ?? mine?.deliveryDate ?? r.deliveryDate;
+  const keptDay = mine?.deliveryDate && mine.deliveryDate > todayIso() ? mine.deliveryDate : undefined; // a day that has passed would be refused
+  const sentDay = dayEdit === undefined ? keptDay : dayEdit || undefined; // cleared: the day asked for
+  const offeredDay = sentDay ?? r.deliveryDate;
   const special = isSpecialDelivery(boot, offerId || r.productId, producerId, r.buyerId, offeredDay);
   const { fit, shelf } = bidFit(boot, offerId || r.productId, producerId, r.deliveryDate, offeredDay);
   const [editing, setEditing] = useState(false);
@@ -101,7 +111,9 @@ function RequestCard({ r, boot, producerId, model, run, lang }: {
       {r.pool && <p data-testid="pool-note" className="mt-1 rounded bg-brand-light px-2 py-1 text-sm text-brand">{t('pooledWith', { qty: r.pool.totalQty, n: r.pool.buyers })}</p>}
       {r.note && <p className="mt-1 text-sm italic text-slate-600">“{r.note}”</p>}
 
-      {!(mine && !editing) && (
+      {r.expired && <p data-testid="demand-expired" className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-900">{t('reqExpiredProducer')}</p>}
+
+      {!r.expired && !(mine && !editing) && (
         <div className="mt-3 text-sm" data-testid="offer-field">
           <label className="font-medium">{t('offerLabel')}
             <select required value={offerId} onChange={(e) => { setOffer(e.target.value); setPrice(undefined); }} aria-label={t('offerLabel')} data-testid="offer-product"
@@ -114,9 +126,9 @@ function RequestCard({ r, boot, producerId, model, run, lang }: {
         </div>
       )}
 
-      {model === 'first_accept' ? (
+      {r.expired && !mine ? null : model === 'first_accept' && !r.expired ? (
         r.targetPrice !== undefined && (
-          <button disabled={!offerId} className="mt-3 rounded bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40"
+          <button disabled={!offerId || working} className="mt-3 rounded bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800 disabled:opacity-40"
             onClick={() => run(() => api(`/requests/${r.id}/take`, { method: 'POST', body: JSON.stringify({ productId: offerId }) }))}>{t('takeIt', { price: r.targetPrice.toFixed(2), qty: r.qty })}{isSpecialDelivery(boot, offerId || r.productId, producerId, r.buyerId, r.deliveryDate) ? ` (${t('specialDelivery').toLowerCase()})` : ''}</button>
         )
       ) : (
@@ -125,20 +137,20 @@ function RequestCard({ r, boot, producerId, model, run, lang }: {
           {mine && !editing ? (
             <div className="mt-2 flex flex-wrap items-center gap-3 rounded bg-gold-light p-2 text-sm" data-testid="my-bid">
               <b>{t('yourBid')}:</b> £{mine.price.toFixed(2)} × {mine.qty}{offered && mine.productId && mine.productId !== r.productId && <span data-testid="my-bid-offer"> · {t('offerInstead', { product: loc(offered.name) })}</span>}{mine.deliveryDate && <span data-testid="my-bid-day"> · {t('bidDelivers', { date: shortDate(mine.deliveryDate, lang) })}</span>}
-              <button className="underline" onClick={() => setEditing(true)}>{t('updateBid')}</button>
-              <button className="text-red-700 underline" onClick={() => run(() => api(`/requests/${r.id}/bids/${mine.id}/withdraw`, { method: 'POST' }))}>{t('withdrawBid')}</button>
+              {!r.expired && <button disabled={working} className="underline" onClick={() => setEditing(true)}>{t('updateBid')}</button>}
+              <button disabled={working} className="text-red-700 underline disabled:opacity-40" onClick={() => run(() => api(`/requests/${r.id}/bids/${mine.id}/withdraw`, { method: 'POST' }))}>{t('withdrawBid')}</button>
             </div>
           ) : (
             <form className="mt-3 flex flex-wrap items-end gap-3 text-sm" onSubmit={async (e) => {
               e.preventDefault();
-              if (await run(() => api(`/requests/${r.id}/bids`, { method: 'POST', body: JSON.stringify({ price: Number(price), qty: Number(qty), productId: offerId, note: note.trim() || undefined, deliveryDate: dayEdit }) }))) setEditing(false);
+              if (await run(() => api(`/requests/${r.id}/bids`, { method: 'POST', body: JSON.stringify({ price: Number(price), qty: Number(qty), productId: offerId, note: note.trim() || undefined, deliveryDate: sentDay ?? '' }) }))) setEditing(false);
             }}>
               <label>{t('bidPriceLabel')}<input required type="number" min={0.01} step={0.01} value={price} onChange={(e) => setPrice(e.target.value)} className={`${input} ml-2 w-24`} /></label>
               <label>{t('bidQtyLabel')}<input required type="number" min={1} max={capacity} step={1} value={qty} onChange={(e) => setQty(e.target.value)} className={`${input} ml-2 w-24`} /></label>
               <label>{t('bidDayLabel')}<input type="date" min={addDays(todayIso(), 1)} value={offeredDay} aria-label={t('bidDayLabel')} data-testid="bid-day"
-                onChange={(e) => setDay(e.target.value || undefined)} className={`${input} ml-2`} /></label>
+                onChange={(e) => setDay(e.target.value)} className={`${input} ml-2`} /></label>
               <label className="min-w-48 flex-1">{t('bidNoteLabel')}<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} className={`${input} ml-2 w-full`} /></label>
-              <button disabled={!offerId} className="rounded bg-brand px-4 py-1.5 font-semibold text-white hover:bg-brand-dark disabled:opacity-40">{mine ? t('updateBid') : t('placeBid')}</button>
+              <button disabled={!offerId || working} className="rounded bg-brand px-4 py-1.5 font-semibold text-white hover:bg-brand-dark disabled:opacity-40">{mine ? t('updateBid') : t('placeBid')}</button>
               {editing && <button type="button" className="underline" onClick={() => setEditing(false)}>{t('cancel')}</button>}
               {(special || fit !== 'on_day') && (
                 <p data-testid="bid-day-note" className="basis-full rounded bg-sky-50 p-2 text-xs text-sky-900">

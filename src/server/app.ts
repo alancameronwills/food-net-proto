@@ -26,11 +26,11 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal error' }, 500);
 });
 
+// Registered before the session middleware below on purpose: health answers without a session (and without seeding one)
 app.get('/health', (c) => c.json({ ok: true }));
 
 // Resolve the demo session (isolated dataset) and, optionally, the acting persona.
 app.use('*', async (c, next) => {
-  if (c.req.path.endsWith('/health')) return next();
   const id = c.req.header('x-session') ?? 'default';
   if (!SESSION_RE.test(id)) return c.json({ error: 'Invalid session id' }, 400);
   const s = session(id);
@@ -70,7 +70,7 @@ const reply = (c: Context<Env>, r: Result<Record<string, unknown>>) => {
 };
 const jsonBody = async (c: Context<Env>): Promise<Record<string, any>> => {
   const b = await c.req.json().catch(() => null);
-  return b && typeof b === 'object' ? b : {};
+  return b && typeof b === 'object' && !Array.isArray(b) ? b : {};
 };
 
 app.post('/listings', async (c) => reply(c, await addListing(c.get('s'), c.get('persona'), await jsonBody(c))));
@@ -132,7 +132,7 @@ app.put('/config', async (c) => {
   const denied = requireOperator(c);
   if (denied) return denied;
   const patch = await c.req.json().catch(() => null);
-  if (!patch || typeof patch !== 'object') return c.json({ error: 'Invalid body' }, 400);
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return c.json({ error: 'Invalid body' }, 400);
   return c.json(await updateConfig(c.get('s'), patch as Record<string, unknown>));
 });
 
