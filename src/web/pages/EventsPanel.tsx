@@ -9,7 +9,7 @@ export function eventText(t: (k: string, o?: Record<string, unknown>) => string,
   const product = p.productId ? boot?.products.find((x) => x.id === p.productId) : undefined;
   return t(`ev_${e.type}`, {
     ...p,
-    product: product ? loc(product.name) : '',
+    product: product ? loc(product.name) : p.productId === 'other' ? t('somethingElse') : '',
     reason: p.reason ? `: ${p.reason}` : '',
     price: p.price !== undefined ? p.price.toFixed(2) : '',
   });

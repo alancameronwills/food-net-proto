@@ -99,7 +99,7 @@ app.post('/requests', async (c) => reply(c, await createRequest(c.get('s'), c.ge
 app.post('/requests/:id/bids', async (c) => reply(c, await placeBid(c.get('s'), c.get('persona'), c.req.param('id'), await jsonBody(c))));
 app.post('/requests/:id/bids/:bid/withdraw', async (c) => reply(c, await withdrawBid(c.get('s'), c.get('persona'), c.req.param('id'), c.req.param('bid'))));
 app.post('/requests/:id/accept', async (c) => reply(c, await acceptBid(c.get('s'), c.get('persona'), c.req.param('id'), (await jsonBody(c)).bidId)));
-app.post('/requests/:id/take', async (c) => reply(c, await takeRequest(c.get('s'), c.get('persona'), c.req.param('id'))));
+app.post('/requests/:id/take', async (c) => reply(c, await takeRequest(c.get('s'), c.get('persona'), c.req.param('id'), await jsonBody(c))));
 app.post('/requests/:id/close', async (c) => reply(c, await closeRequest(c.get('s'), c.get('persona'), c.req.param('id'))));
 
 // Notifications for the acting organisation, and the network-wide activity feed.

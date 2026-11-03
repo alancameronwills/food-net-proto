@@ -1,7 +1,7 @@
 import { addDays, isIsoDate, mondayOf, todayIso } from '../shared/dates';
 import { localStatus } from '../shared/models';
 import { MAX_DAYS_AHEAD, deliveryRule, isUsualDay } from '../shared/delivery';
-import type { Bid, Category, DemandRequest, Listing, Order, Organisation, RequestView, SupplyWindow } from '../shared/types';
+import { OTHER_PRODUCT, type Bid, type Category, type DemandRequest, type Listing, type Order, type Organisation, type RequestView, type SupplyWindow } from '../shared/types';
 import type { Session, TxItem } from './db';
 import { emit, type EventParams, type EventType } from './events';
 import type { Result } from './producer';
@@ -33,7 +33,14 @@ function inRange(ctx: Ctx, buyerId: string, producerId: string, category: Catego
 const remaining = (r: DemandRequest) => r.qty - r.filledQty;
 const OFF = 'Demand requests are switched off. The network operator can switch them on in the Model Lab.';
 
-const poolKey = (r: Pick<DemandRequest, 'productId' | 'deliveryDate'>) => `${r.productId}#${mondayOf(r.deliveryDate)}`;
+// Requests for something else never pool: they are not the same thing
+const poolKey = (r: Pick<DemandRequest, 'id' | 'productId' | 'deliveryDate'>) => `${r.productId === OTHER_PRODUCT ? r.id : r.productId}#${mondayOf(r.deliveryDate)}`;
+
+/** The category whose local range applies. For something else (no category) the widest range, so every producer who might help can see it. */
+function categoryOf(ctx: Ctx, productId: string): Category {
+  const product = ctx.products.get(productId);
+  return (product && ctx.categories.get(product.category)) || [...ctx.categories.values()].reduce((a, b) => (b.maxDriveKm > a.maxDriveKm ? b : a));
+}
 
 async function say(s: Session, type: EventType, r: DemandRequest, extra: EventParams, to: string[]) {
   try {
@@ -53,7 +60,7 @@ export async function listRequests(s: Session, actor: Organisation | undefined):
   if (!(await getConfig(s)).demandOn) return []; // kept, but out of sight until switched back on
   const all = await s.list<DemandRequest>('REQUEST');
   const ctx = await load(s);
-  const catOf = (r: DemandRequest) => ctx.categories.get(ctx.products.get(r.productId)!.category)!;
+  const catOf = (r: DemandRequest) => categoryOf(ctx, r.productId);
 
   const pools = new Map<string, { totalQty: number; requests: number; buyers: Set<string> }>();
   if (ctx.config.speculative === 'pooled') {
@@ -87,9 +94,10 @@ export async function createRequest(s: Session, actor: Organisation | undefined,
   if (actor?.role !== 'buyer') return fail(403, 'Only buyers can make requests');
   const ctx = await load(s);
   if (!ctx.config.demandOn) return fail(409, OFF);
+  const other = body.productId === OTHER_PRODUCT;
   const product = ctx.products.get(body.productId);
-  const category = product && ctx.categories.get(product.category);
-  if (!product || !category) return fail(400, 'Unknown product');
+  if (!other && !product) return fail(400, 'Unknown product');
+  const category = categoryOf(ctx, other ? OTHER_PRODUCT : body.productId);
   if (!isQty(body.qty)) return fail(400, 'qty must be a whole number of at least 1');
   if (!isIsoDate(body.deliveryDate)) return fail(400, 'deliveryDate required (YYYY-MM-DD)');
   // Any day from tomorrow is fine, even one the product is not normally delivered on, or at short notice: producers can
@@ -100,10 +108,11 @@ export async function createRequest(s: Session, actor: Organisation | undefined,
   const targetPrice = body.targetPrice ?? undefined;
   if (ctx.config.speculative === 'first_accept' && targetPrice === undefined) return fail(400, 'First-to-accept requests need a price you will pay');
   const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 300) : undefined;
+  if (other && !note) return fail(400, 'Say what you want in the note, so producers know what to offer');
 
   const seq = await s.nextSeq('META', 'request-seq');
   const request: DemandRequest = {
-    id: `DR-${100 + seq}`, buyerId: actor.id, productId: product.id, qty: body.qty, deliveryDate: body.deliveryDate,
+    id: `DR-${100 + seq}`, buyerId: actor.id, productId: other ? OTHER_PRODUCT : product!.id, qty: body.qty, deliveryDate: body.deliveryDate,
     targetPrice, note, status: 'open', filledQty: 0, bids: [], createdAt: new Date().toISOString(), version: 1,
   };
   await s.create('REQUEST', request.id, request);
@@ -135,7 +144,7 @@ export async function closeRequest(s: Session, actor: Organisation | undefined, 
 
 // ---- bidding -----------------------------------------------------------------------------------
 
-type BidBody = { price?: unknown; qty?: unknown; note?: unknown; deliveryDate?: unknown };
+type BidBody = { price?: unknown; qty?: unknown; note?: unknown; deliveryDate?: unknown; productId?: unknown };
 
 /**
  * A producer bids on a request. Under pooled demand a single bid (a total capacity and a price) is spread
@@ -160,13 +169,15 @@ export async function placeBid(s: Session, actor: Organisation | undefined, id: 
 
   const first = await s.get<DemandRequest>('REQUEST', id);
   if (!first) return fail(404, 'No such request');
-  const product = ctx.products.get(first.productId)!;
-  const category = ctx.categories.get(product.category)!;
+  const category = categoryOf(ctx, first.productId);
+  // What is offered: the product asked for unless the producer names another. A request for something else needs it named
+  const offered = offeredProduct(ctx, first, body.productId);
+  if (!offered.ok) return offered;
   if (first.status !== 'open') return fail(409, `This request is already ${first.status}`);
   if (!inRange(ctx, first.buyerId, actor.id, category)) return fail(403, 'This buyer is outside your local range');
   // Which requests does this bid apply to?
   let targets = [first];
-  if (ctx.config.speculative === 'pooled') {
+  if (ctx.config.speculative === 'pooled' && first.productId !== OTHER_PRODUCT && offered.productId === first.productId) {
     targets = (await s.list<DemandRequest>('REQUEST'))
       .filter((r) => r.status === 'open' && poolKey(r) === poolKey(first) && inRange(ctx, r.buyerId, actor.id, category))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -179,23 +190,31 @@ export async function placeBid(s: Session, actor: Organisation | undefined, id: 
   for (const t of targets) {
     const give = Math.min(capacity, remaining(t));
     if (give <= 0) continue;
-    const bid = await upsertBid(s, t.id, actor.id, { price: body.price as number, qty: give, note, deliveryDate });
+    const bid = await upsertBid(s, t.id, actor.id, { price: body.price as number, qty: give, note, deliveryDate, productId: offered.productId });
     if (!bid) continue;
     capacity -= give;
     placed.push(bid);
     const live = (await s.get<DemandRequest>('REQUEST', t.id))!;
-    await say(s, 'bid_placed', live, { producer: actor.name, price: bid.price, qty: bid.qty }, [t.buyerId]);
+    await say(s, 'bid_placed', live, { producer: actor.name, price: bid.price, qty: bid.qty, productId: offered.productId }, [t.buyerId]);
   }
   if (placed.length === 0) return fail(409, 'Nothing to bid on: the request has been filled or closed');
   return { ok: true, bids: placed };
 }
 
+/** The product a producer offers against a request: the one named, else the one asked for. Must be a real catalogue product. */
+function offeredProduct(ctx: Ctx, r: DemandRequest, named: unknown): Result<{ productId: string }> {
+  const id = named === undefined || named === null || named === '' ? r.productId : named;
+  if (id === OTHER_PRODUCT) return fail(400, 'Say what you are offering');
+  if (typeof id !== 'string' || !ctx.products.has(id)) return fail(400, 'Unknown product offered');
+  return { ok: true, productId: id };
+}
+
 /** Add this producer's bid to a request, replacing any earlier open bid from them. */
-async function upsertBid(s: Session, requestId: string, producerId: string, v: { price: number; qty: number; note?: string; deliveryDate?: string }): Promise<Bid | undefined> {
+async function upsertBid(s: Session, requestId: string, producerId: string, v: { price: number; qty: number; note?: string; deliveryDate?: string; productId: string }): Promise<Bid | undefined> {
   for (let attempt = 0; attempt < RETRIES; attempt++) {
     const r = await s.get<DemandRequest>('REQUEST', requestId);
     if (!r || r.status !== 'open') return undefined;
-    const bid: Bid = { id: `b-${Date.now().toString(36)}${rand()}`, producerId, price: v.price, qty: Math.min(v.qty, remaining(r)), note: v.note, ...(v.deliveryDate ? { deliveryDate: v.deliveryDate } : {}), createdAt: new Date().toISOString(), status: 'open' };
+    const bid: Bid = { id: `b-${Date.now().toString(36)}${rand()}`, producerId, productId: v.productId, price: v.price, qty: Math.min(v.qty, remaining(r)), note: v.note, ...(v.deliveryDate ? { deliveryDate: v.deliveryDate } : {}), createdAt: new Date().toISOString(), status: 'open' };
     const bids = [...r.bids.filter((b) => !(b.producerId === producerId && b.status === 'open')), bid];
     const tx = await s.transact([s.tPut('REQUEST', requestId, { ...r, bids, version: r.version + 1 }, '#v = :v', { '#v': 'version' }, { ':v': r.version })]);
     if (tx.ok) return bid;
@@ -239,14 +258,17 @@ async function fulfil(
     const qty = bid.qty;
     if (qty > remaining(r)) return fail(409, `Only ${remaining(r)} is still wanted`);
 
-    const listingId = `${producerId}:${r.productId}`;
-    const listing: Listing = { id: listingId, producerId, productId: r.productId, pricePerUnit: bid.price, minOrder: 1, certifications: [] };
+    // The order is for what was offered, which need not be what was asked for
+    const productId = bid.productId ?? r.productId;
+    if (!ctx.products.has(productId)) return fail(400, 'This offer does not say what is being offered');
+    const listingId = `${producerId}:${productId}`;
+    const listing: Listing = { id: listingId, producerId, productId, pricePerUnit: bid.price, minOrder: 1, certifications: [] };
     await s.create('LISTING', listingId, listing); // harmless if they already sell it
 
     // Delivered on the day the bid offered (else the day asked for). If that is not one of the producer's usual days
     // for this buyer, it is a special delivery
     const deliveryDate = bid.deliveryDate ?? r.deliveryDate;
-    const category = ctx.categories.get(ctx.products.get(r.productId)!.category)!;
+    const category = categoryOf(ctx, productId);
     const producerOrg = await s.get<Organisation>('ORG', producerId);
     const buyerOrg = await s.get<Organisation>('ORG', r.buyerId);
     const special = !isUsualDay(deliveryRule(ctx.config, category, undefined, producerOrg, buyerOrg?.area), deliveryDate);
@@ -261,7 +283,7 @@ async function fulfil(
     const at = new Date().toISOString();
     const order: Order = {
       id: `BL-${1000 + seq}`, groupId: `g-${requestId}-${bid.id}`, buyerId: r.buyerId, producerId, deliveryDate,
-      ...(special ? { special: true } : {}), status: 'confirmed', stock: 'reserved', deliveryMode: ctx.config.delivery as Order['deliveryMode'], lines: [{ listingId, productId: r.productId, qty, unitPrice: bid.price, ...(r.note ? { note: r.note } : {}) }],
+      ...(special ? { special: true } : {}), status: 'confirmed', stock: 'reserved', deliveryMode: ctx.config.delivery as Order['deliveryMode'], lines: [{ listingId, productId, qty, unitPrice: bid.price, ...(r.note ? { note: r.note } : {}) }],
       total: Math.round(qty * bid.price * 100) / 100, source: { requestId, bidId: bid.id }, createdAt: at,
       history: [{ at, status: 'confirmed', by }],
     };
@@ -287,7 +309,7 @@ async function fulfil(
         if (losers.length) await say(s, 'bid_rejected', next, {}, losers);
         if (ctx.config.speculative === 'first_accept') {
           // Nobody bid, so tell everyone who could have taken it that it has gone
-          const category = ctx.categories.get(ctx.products.get(r.productId)!.category)!;
+          const category = categoryOf(ctx, r.productId);
           const others: string[] = [];
           for (const id of Object.keys(ctx.distances[r.buyerId] ?? {})) {
             const org = await s.get<Organisation>('ORG', id);
@@ -317,19 +339,21 @@ export async function acceptBid(s: Session, actor: Organisation | undefined, id:
 }
 
 /** First-to-accept: a producer takes the buyer's whole request at the buyer's price; the first to arrive wins. */
-export async function takeRequest(s: Session, actor: Organisation | undefined, id: string): Promise<Result<{ order: Order; request: RequestView }>> {
+export async function takeRequest(s: Session, actor: Organisation | undefined, id: string, body: { productId?: unknown } = {}): Promise<Result<{ order: Order; request: RequestView }>> {
   if (actor?.role !== 'producer') return fail(403, 'Only producers can accept a request');
   const ctx = await load(s);
   if (!ctx.config.demandOn) return fail(409, OFF);
   if (ctx.config.speculative !== 'first_accept') return fail(409, 'Requests are not first-to-accept under the current model; place a bid instead');
   const r0 = await s.get<DemandRequest>('REQUEST', id);
   if (!r0) return fail(404, 'No such request');
-  const category = ctx.categories.get(ctx.products.get(r0.productId)!.category)!;
+  const category = categoryOf(ctx, r0.productId);
   if (!inRange(ctx, r0.buyerId, actor.id, category)) return fail(403, 'This buyer is outside your local range');
+  const offered = offeredProduct(ctx, r0, body.productId);
+  if (!offered.ok) return offered;
   if (r0.targetPrice === undefined) return fail(409, 'This request has no price to accept; place a bid instead');
   const res = await fulfil(s, ctx, id, actor.id, (r) => {
     if (r.filledQty > 0) return fail(409, 'Somebody else already accepted this request');
-    return { ok: true, bid: { id: `b-${Date.now().toString(36)}${rand()}`, producerId: actor.id, price: r.targetPrice!, qty: r.qty, createdAt: new Date().toISOString(), status: 'open' } };
+    return { ok: true, bid: { id: `b-${Date.now().toString(36)}${rand()}`, producerId: actor.id, productId: offered.productId, price: r.targetPrice!, qty: r.qty, createdAt: new Date().toISOString(), status: 'open' } };
   }, actor.id);
   return res.ok ? { ...res, request: (await listRequests(s, actor)).find((x) => x.id === id)! } : res;
 }

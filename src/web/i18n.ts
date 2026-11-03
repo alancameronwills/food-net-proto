@@ -141,6 +141,13 @@ const en = {
   extraDaysTitle: 'Special delivery days', extraDaysHelp: 'Add a one-off day when you will be delivering outside your usual rounds. Buyers can then order your products for that day, as long as you have stock that week.',
   extraDayDate: 'Day', extraDayNote: 'Note', extraDayNotePlaceholder: 'e.g. Going to Cardigan anyway', addExtraDay: 'Add day', noExtraDays: 'No special delivery days added.',
   units: { litre: 'litre', kg: 'kg', dozen: 'dozen', loaf: 'loaf', each: 'each', crate: 'crate' },
+  unitsOther: 'items', somethingElse: 'something else',
+  reqSomethingElse: 'Something else (not in the list)…',
+  reqElseHelp: 'Say what you want in the note below. Producers will read it and can offer you something close.',
+  offerLabel: 'What you are offering', offerChoose: 'Choose from your products…',
+  offerElseHelp: 'The buyer asked for something that is not in the catalogue. Read their note, then choose which of your products to offer.',
+  offerOtherHelp: 'You can offer something other than what was asked for. If the buyer accepts, the order is for the item you offer.',
+  offerInstead: 'Offering {{product}} instead', bidOffers: 'Offering: {{product}}',
 };
 const cy: typeof en = {
   title: "Bwyd Bro'r Garreg Las",
@@ -280,6 +287,13 @@ const cy: typeof en = {
   extraDaysTitle: 'Diwrnodau dosbarthu arbennig', extraDaysHelp: 'Ychwanegwch ddiwrnod untro pan fyddwch yn dosbarthu y tu allan i’ch rowndiau arferol. Yna gall prynwyr archebu eich cynhyrchion ar gyfer y diwrnod hwnnw, cyhyd â bod gennych stoc yr wythnos honno.',
   extraDayDate: 'Diwrnod', extraDayNote: 'Nodyn', extraDayNotePlaceholder: 'e.e. Mynd i Aberteifi beth bynnag', addExtraDay: 'Ychwanegu diwrnod', noExtraDays: 'Heb ychwanegu diwrnodau dosbarthu arbennig.',
   units: { litre: 'litr', kg: 'kg', dozen: 'dwsin', loaf: 'torth', each: 'yr un', crate: 'cawell' },
+  unitsOther: 'eitem', somethingElse: 'rhywbeth arall',
+  reqSomethingElse: 'Rhywbeth arall (nad yw ar y rhestr)…',
+  reqElseHelp: 'Dywedwch beth rydych ei eisiau yn y nodyn isod. Bydd cynhyrchwyr yn ei ddarllen ac yn gallu cynnig rhywbeth tebyg i chi.',
+  offerLabel: 'Beth rydych yn ei gynnig', offerChoose: 'Dewiswch o’ch cynhyrchion…',
+  offerElseHelp: 'Gofynnodd y prynwr am rywbeth nad yw yn y catalog. Darllenwch ei nodyn, yna dewiswch pa un o’ch cynhyrchion i’w gynnig.',
+  offerOtherHelp: 'Gallwch gynnig rhywbeth heblaw’r hyn y gofynnwyd amdano. Os bydd y prynwr yn derbyn, bydd yr archeb ar gyfer yr eitem rydych yn ei chynnig.',
+  offerInstead: 'Cynnig {{product}} yn lle hynny', bidOffers: 'Yn cynnig: {{product}}',
 };
 
 const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('lang') : null;

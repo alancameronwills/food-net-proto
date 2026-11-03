@@ -37,9 +37,10 @@ async function askFor(page: Page, o: { product?: string; qty: number; target?: n
   return testId!.replace('request-', '');
 }
 
-async function bid(page: Page, id: string, price: number, qty: number, note?: string) {
+async function bid(page: Page, id: string, price: number, qty: number, note?: string, offer?: string) {
   await page.getByRole('tab', { name: /^Demand board/ }).click();
   const card = page.getByTestId(`demand-${id}`);
+  if (offer) await card.getByTestId('offer-product').selectOption({ label: offer }); // needed when the producer does not list what was asked for
   await card.getByLabel(/^Your price/).fill(String(price));
   await card.getByLabel(/^How many/).fill(String(qty));
   if (note) await card.getByLabel(/^Message/).fill(note);
@@ -161,7 +162,7 @@ test.describe('speculative orders: open RFQ', () => {
     const farm = await person(browser, producerUrl(s, 'preseli-hill-farm')); // no milk today
     try {
       const id = await askFor(buyer.page, { qty: 30, date: FAR });
-      await bid(farm.page, id, 1.2, 30);
+      await bid(farm.page, id, 1.2, 30, undefined, 'Whole milk');
       await buyer.page.getByTestId(`request-${id}`).getByRole('button', { name: 'Accept bid' }).click();
       await expect(buyer.page.getByTestId(`request-${id}`).getByTestId('request-status')).toHaveText('Filled');
       await farm.page.getByRole('tab', { name: 'My listings' }).click();
@@ -328,6 +329,75 @@ test.describe('speculative orders: other models', () => {
       await expect(op.page.getByTestId('metrics')).toContainText('Open requests');
     } finally {
       await op.close();
+    }
+  });
+});
+
+test.describe('speculative orders: something else, and offering a different item', () => {
+  test('a buyer asks for something not in the catalogue; a producer offers one of their products; accepting orders that item', async ({ browser, request }) => {
+    const s = newSession();
+    await setModel(request, s);
+    const buyer = await person(browser, buyerUrl(s));
+    const baker = await person(browser, producerUrl(s, 'nevern-bakery'));
+    try {
+      await buyer.page.getByRole('tab', { name: /^Ask for something/ }).click();
+      const form = buyer.page.getByTestId('request-form');
+      await form.getByLabel('Product').selectOption({ label: 'Something else (not in the list)…' });
+      await expect(form.getByTestId('else-help')).toBeVisible();
+      await form.getByLabel(/^Quantity/).fill('30');
+      await form.getByRole('button', { name: 'Send request' }).click(); // the note is required
+      await expect(form.getByLabel('Anything producers should know')).toBeFocused();
+      await expect(buyer.page.locator('[data-testid^="request-DR-"]')).toHaveCount(0);
+      await form.getByLabel('Anything producers should know').fill('Seeded rye rolls, baked the morning of delivery');
+      await form.getByRole('button', { name: 'Send request' }).click();
+      const card = buyer.page.locator('[data-testid^="request-DR-"]').first();
+      await expect(card).toContainText('30 items something else');
+      await expect(card).toContainText('Seeded rye rolls');
+      const id = (await card.getAttribute('data-testid'))!.replace('request-', '');
+
+      // The baker sells neither: the offer field starts empty, and they cannot bid until they choose
+      await baker.page.getByRole('tab', { name: /^Demand board/ }).click();
+      const demand = baker.page.getByTestId(`demand-${id}`);
+      await expect(demand).toContainText('Seeded rye rolls');
+      await expect(demand.getByTestId('offer-product')).toHaveValue('');
+      await expect(demand.getByRole('button', { name: 'Place bid' })).toBeDisabled();
+      await demand.getByTestId('offer-product').selectOption({ label: 'Sourdough loaf' });
+      await expect(demand.getByLabel(/^Your price/)).toHaveValue('3.6'); // the price of their own listing
+      await demand.getByLabel(/^How many/).fill('12');
+      await demand.getByRole('button', { name: 'Place bid' }).click();
+      await expect(demand.getByTestId('my-bid')).toContainText('£3.60 × 12');
+      await expect(demand.getByTestId('my-bid-offer')).toContainText('Offering Sourdough loaf instead');
+
+      // The buyer sees what is offered, accepts, and the order is for the loaf
+      await expect(card.getByTestId(`bid-offers-${id}-nevern-bakery`)).toContainText('Offering: Sourdough loaf');
+      await card.getByRole('button', { name: 'Accept bid' }).click();
+      await expect(card.getByTestId(`bid-${id}-nevern-bakery`)).toContainText('Order BL-');
+      await buyer.page.getByRole('tab', { name: /^My orders/ }).click();
+      await expect(buyer.page.getByText('Sourdough loaf').first()).toBeVisible();
+      await buyer.page.getByRole('tab', { name: /^Ask for something/ }).click();
+      await expect(buyer.page.getByTestId(`request-${id}`).getByTestId('request-status')).toHaveText('Open'); // 18 still wanted
+    } finally {
+      await buyer.close(); await baker.close();
+    }
+  });
+
+  test('when the producer sells what was asked for, the offer starts as that item but can be changed', async ({ browser, request }) => {
+    const s = newSession();
+    await setModel(request, s);
+    const r = await request.post('/api/requests', { headers: as(s, 'corner-deli'), data: { productId: 'milk-whole', qty: 40, deliveryDate: FAR } });
+    const id = (await r.json()).request.id as string;
+    const dairy = await person(browser, producerUrl(s));
+    try {
+      await dairy.page.getByRole('tab', { name: /^Demand board/ }).click();
+      const demand = dairy.page.getByTestId(`demand-${id}`);
+      await expect(demand.getByTestId('offer-product')).toHaveValue('milk-whole');
+      await demand.getByTestId('offer-product').selectOption({ label: 'Semi-skimmed milk' });
+      await expect(demand.getByLabel(/^Your price/)).toHaveValue('0.9');
+      await demand.getByLabel(/^How many/).fill('40');
+      await demand.getByRole('button', { name: 'Place bid' }).click();
+      await expect(demand.getByTestId('my-bid-offer')).toContainText('Offering Semi-skimmed milk instead');
+    } finally {
+      await dairy.close();
     }
   });
 });

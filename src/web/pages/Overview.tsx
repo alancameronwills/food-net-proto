@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { loc } from '../i18n';
 import type { Order, RequestView } from '../../shared/types';
 import type { Bootstrap } from '../api';
+import { requestedAs } from '../requested';
 import { fmtDate } from './StockEditor';
 import { STATUS_STYLE } from './OrderCard';
 
@@ -74,7 +75,7 @@ export function Overview({ orders, requests, boot }: { orders: Order[]; requests
                   <tr key={r.id} className="border-t border-slate-100" data-testid={`overview-${r.id}`}>
                     <td className="p-2 font-mono">{r.id}</td>
                     <td className="p-2">{orgs.get(r.buyerId)?.name}</td>
-                    <td className="p-2">{loc(boot.products.find((p) => p.id === r.productId)!.name)}</td>
+                    <td className="p-2">{requestedAs(boot, r.productId, t).name}</td>
                     <td className="p-2">{r.filledQty}/{r.qty}</td>
                     <td className="p-2">{fmtDate(r.deliveryDate, i18n.language)}</td>
                     <td className="p-2">{t(`reqStatus_${r.status}`)}</td>

@@ -118,9 +118,14 @@ export type Order = {
 };
 
 export type BidStatus = 'open' | 'accepted' | 'rejected' | 'withdrawn';
+/** A request's product when the buyer wants something that is not in the catalogue; they say what in the note. */
+export const OTHER_PRODUCT = 'other';
+
 export type Bid = {
   id: string;
   producerId: string;
+  /** What the producer offers. Defaults to the product asked for; for a request for something else the producer must say. */
+  productId?: string;
   price: number; // GBP per unit
   qty: number;
   /** The day the producer offers to deliver. Defaults to the day the buyer needs it; may be earlier, later, or a special delivery. */

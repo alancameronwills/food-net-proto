@@ -11,6 +11,8 @@ import type { RequestView, SupplyWindow } from '../../shared/types';
 import { api, type Bootstrap } from '../api';
 import { loc } from '../i18n';
 import { longDate } from './Browse';
+import { requestedAs, isOther } from '../requested';
+import { OTHER_PRODUCT } from '../../shared/types';
 import { TrustChip } from './TrustChip';
 
 const input = 'rounded border border-slate-300 bg-white px-2 py-1';
@@ -63,6 +65,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
   const [busy, setBusy] = useState(false);
   const model = boot.config.speculative;
   const product = boot.products.find((p) => p.id === productId);
+  const else_ = isOther(productId);
   const dateNote = product ? requestDateNote(boot, product.id, date) : undefined;
 
   const run = async (f: () => Promise<unknown>) => {
@@ -104,10 +107,12 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
             {byCategory.map(({ c, items }) => (
               <optgroup key={c.id} label={loc(c.name)}>{items.map((p) => <option key={p.id} value={p.id}>{loc(p.name)}</option>)}</optgroup>
             ))}
+            <option value={OTHER_PRODUCT}>{t('reqSomethingElse')}</option>
           </select>
         </label>
+        {else_ && <p data-testid="else-help" className="rounded bg-sky-50 p-2 text-sm text-sky-900">{t('reqElseHelp')}</p>}
         <div className="flex gap-3">
-          <label className="block flex-1 text-sm font-medium">{t('reqQty')}{product && ` (${t(`units.${product.unit}`)})`}
+          <label className="block flex-1 text-sm font-medium">{t('reqQty')}{product ? ` (${t(`units.${product.unit}`)})` : else_ ? ` (${t('unitsOther')})` : ''}
             <input required type="number" min={1} step={1} value={qty} onChange={(e) => setQty(e.target.value)} className={`${input} mt-1 w-full`} />
           </label>
           <label className="block flex-1 text-sm font-medium">{t('reqDate')}
@@ -118,7 +123,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
           <input required={model === 'first_accept'} type="number" min={0.01} step={0.01} value={target} onChange={(e) => setTarget(e.target.value)} className={`${input} mt-1 w-full`} />
         </label>
         <label className="block text-sm font-medium">{t('reqNote')}
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={300} className={`${input} mt-1 w-full`} />
+          <textarea required={else_} value={note} onChange={(e) => setNote(e.target.value)} rows={else_ ? 3 : 2} maxLength={300} className={`${input} mt-1 w-full`} />
         </label>
         {dateNote && (
           <p data-testid="date-note" className="rounded bg-sky-50 p-2 text-sm text-sky-900">
@@ -141,16 +146,16 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
         {requests.length === 0 && <p className="text-slate-600">{t('noRequests')}</p>}
         <div className="space-y-4">
           {requests.map((r) => {
-            const p = boot.products.find((x) => x.id === r.productId)!;
+            const asked = requestedAs(boot, r.productId, t);
             const left = r.qty - r.filledQty;
             return (
               <article key={r.id} data-testid={`request-${r.id}`} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-mono font-semibold">{r.id}</span>
                   <span data-testid="request-status" className={`rounded px-2 py-0.5 text-sm font-semibold ${STATUS[r.status]}`}>{t(`reqStatus_${r.status}`)}</span>
-                  <b>{r.qty} {t(`units.${p.unit}`)} {loc(p.name)}</b>
+                  <b>{r.qty} {asked.unit} {asked.name}</b>
                   <span className="text-sm text-slate-600">{longDate(r.deliveryDate, i18n.language)}</span>
-                  {r.targetPrice !== undefined && <span className="text-sm text-slate-600">£{r.targetPrice.toFixed(2)} / {t(`units.${p.unit}`)}</span>}
+                  {r.targetPrice !== undefined && <span className="text-sm text-slate-600">£{r.targetPrice.toFixed(2)} / {asked.product ? asked.unit : t('unitsOther')}</span>}
                   {r.filledQty > 0 && <span className="text-sm text-emerald-800">{t('reqFilled', { filled: r.filledQty, qty: r.qty })}</span>}
                 </div>
                 {requestDateNote(boot, r.productId, r.deliveryDate) && r.status === 'open' && (
@@ -159,7 +164,7 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                 {r.pool && <p data-testid="pool-note" className="mt-1 rounded bg-brand-light px-2 py-1 text-sm text-brand">{t('pooledWith', { qty: r.pool.totalQty, n: r.pool.buyers })}</p>}
                 {r.note && <p className="mt-1 text-sm italic text-slate-600">“{r.note}”</p>}
 
-                {r.status === 'open' && <div className="mt-2"><ReachNote boot={boot} buyerId={buyerId} productId={r.productId} testId="reach-request" /></div>}
+                {r.status === 'open' && !isOther(r.productId) && <div className="mt-2"><ReachNote boot={boot} buyerId={buyerId} productId={r.productId} testId="reach-request" /></div>}
                 {r.bids.length === 0 && r.status === 'open' && (
                   <p className="mt-2 text-sm text-slate-600">{model === 'first_accept' && r.targetPrice !== undefined ? t('waitingTake', { price: r.targetPrice.toFixed(2) }) : t('waitingBids')}</p>
                 )}
@@ -177,10 +182,13 @@ export function RequestsBuyer({ buyerId, boot, windows, requests, reload, onBrow
                             <td className="py-1">{org.name}<div className="text-xs text-slate-500">{org.town}{km !== undefined && ` · ${t('km', { n: km })}`}</div><TrustChip producerId={b.producerId} boot={boot} />
                               {(() => {
                                 const day = b.deliveryDate ?? r.deliveryDate;
-                                const { fit, shelf } = bidFit(boot, r.productId, b.producerId, r.deliveryDate, day);
-                                const special = isSpecialDelivery(boot, r.productId, b.producerId, r.buyerId, day);
+                                const offeredId = b.productId ?? r.productId;
+                                const { fit, shelf } = bidFit(boot, offeredId, b.producerId, r.deliveryDate, day);
+                                const special = isSpecialDelivery(boot, offeredId, b.producerId, r.buyerId, day);
+                                const offered = boot.products.find((x) => x.id === offeredId);
                                 return (
                                   <div className="mt-1 text-xs" data-testid={`bid-delivery-${r.id}-${b.producerId}`}>
+                                    {offered && <div data-testid={`bid-offers-${r.id}-${b.producerId}`} className={`mb-0.5 font-semibold ${offeredId === r.productId ? 'text-slate-700' : 'text-brand'}`}>{t('bidOffers', { product: loc(offered.name) })}</div>}
                                     <span className="font-medium">{t('bidDelivers', { date: shortDate(day, i18n.language) })}</span>
                                     {fit !== 'on_day' && <span data-testid="bid-fit" data-fit={fit} className={`ml-1 rounded px-1.5 py-0.5 ${fit === 'early' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>{t(`fit_${fit}`, { time: duration(t, shelf) })}</span>}
                                     {special && <span data-testid="bid-special" className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-sky-900">{t('specialDelivery')}</span>}

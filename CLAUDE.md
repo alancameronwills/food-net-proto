@@ -35,4 +35,5 @@ Commit messages end with the Co-Authored-By line given in the session's attribut
 - Model options live in `src/shared/models.ts` (`capabilities`, `sanitiseConfig`, presets). Older sessions are upgraded in place (`SEED_VERSION`, `upgradeSession`); new config fields need a default in `DEFAULT_CONFIG`.
 - Reset takes a lock and marks the session `resetting`; readers wait. First seeding of a session also takes a lock.
 - Delivery rules, shelf life and special deliveries: `src/shared/delivery.ts`, `availability.ts`. Requests accept any future date; producers may bid with their own date.
+  A request's product may be `OTHER_PRODUCT` ("something else", note required, widest local range, never pooled); a bid carries `productId` (what is offered, defaults to the product asked for) and the order is for that.
 - Welsh text is machine-translated (`src/web/i18n.ts`); keep both languages in step.

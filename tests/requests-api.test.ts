@@ -268,3 +268,74 @@ describe.skipIf(!dbUp)('pooled demand', () => {
     expect(((await as('corner-deli').get('/orders')).body as Order[])).toHaveLength(0);
   });
 });
+
+describe.skipIf(!dbUp)('something else, and offering something other than what was asked for', () => {
+  const else_ = (extra: Record<string, unknown> = {}) => ({ productId: 'other', qty: 30, deliveryDate: DATE, note: 'Rye flour, stoneground', ...extra });
+
+  it('needs a note saying what is wanted, and every producer in the widest range can see it', async () => {
+    const { as } = await setup({ localRange: 'category' });
+    expect((await as('corner-deli').post('/requests', else_({ note: '  ' }))).status).toBe(400);
+    expect((await as('corner-deli').post('/requests', { ...else_(), note: undefined })).status).toBe(400);
+    const r = await as('harbour-bistro').post('/requests', else_());
+    expect(r.status).toBe(200);
+    expect(r.body.request).toMatchObject({ productId: 'other', qty: 30, note: 'Rye flour, stoneground', status: 'open' });
+    // Harbour Bistro is too far from the dairies for milk, but "something else" uses the widest range (cheese, 100 km)
+    const seen = ((await as('dyfed-dairy').get('/requests')).body as RequestView[]).some((x) => x.id === r.body.request.id);
+    expect(seen).toBe(true);
+  });
+
+  it('a bid for something else must say what is offered; the order is for that item and reduces what is wanted', async () => {
+    const { as } = await setup();
+    const id = (await as('corner-deli').post('/requests', else_())).body.request.id;
+    expect((await as('nevern-bakery').post(`/requests/${id}/bids`, { price: 4, qty: 10 })).status).toBe(400); // nothing named
+    expect((await as('nevern-bakery').post(`/requests/${id}/bids`, { price: 4, qty: 10, productId: 'other' })).status).toBe(400);
+    expect((await as('nevern-bakery').post(`/requests/${id}/bids`, { price: 4, qty: 10, productId: 'no-such' })).status).toBe(400);
+    expect((await as('nevern-bakery').post(`/requests/${id}/bids`, { price: 4, qty: 31, productId: 'bread-sour' })).status).toBe(400); // more than wanted
+
+    const bid = await as('nevern-bakery').post(`/requests/${id}/bids`, { price: 4, qty: 10, productId: 'bread-sour' });
+    expect(bid.status).toBe(200);
+    expect(bid.body.bids[0]).toMatchObject({ productId: 'bread-sour', qty: 10, price: 4 });
+
+    const mine = ((await as('corner-deli').get('/requests')).body as RequestView[]).find((r) => r.id === id)!;
+    const acc = await as('corner-deli').post(`/requests/${id}/accept`, { bidId: mine.bids[0].id });
+    expect(acc.status).toBe(200);
+    expect(acc.body.order).toMatchObject({ producerId: 'nevern-bakery', total: 40, lines: [{ productId: 'bread-sour', qty: 10, unitPrice: 4 }] });
+    expect(acc.body.request).toMatchObject({ filledQty: 10, status: 'open' }); // 20 still wanted
+    const orders = (await as('nevern-bakery').get('/orders')).body as Order[];
+    expect(orders.some((o) => o.lines[0].productId === 'bread-sour')).toBe(true);
+  });
+
+  it('a producer may offer a different product from the one asked for', async () => {
+    const { as } = await setup();
+    const id = (await as('corner-deli').post('/requests', ask({ qty: 20 }))).body.request.id; // 20 whole milk
+    // Semi-skimmed instead; no productId at all still means the product asked for
+    const bid = await as('dyfed-dairy').post(`/requests/${id}/bids`, { price: 0.9, qty: 20, productId: 'milk-semi' });
+    expect(bid.status).toBe(200);
+    const plain = await as('brongest-creamery').post(`/requests/${id}/bids`, { price: 1, qty: 5 });
+    expect(plain.body.bids[0].productId).toBe('milk-whole');
+
+    const view = ((await as('corner-deli').get('/requests')).body as RequestView[]).find((r) => r.id === id)!;
+    const semi = view.bids.find((b) => b.producerId === 'dyfed-dairy')!;
+    const acc = await as('corner-deli').post(`/requests/${id}/accept`, { bidId: semi.id });
+    expect(acc.body.order.lines[0]).toMatchObject({ productId: 'milk-semi', qty: 20 });
+    expect(acc.body.request).toMatchObject({ status: 'filled', filledQty: 20 });
+    expect(acc.body.request.bids.find((b: any) => b.producerId === 'brongest-creamery').status).toBe('rejected');
+  });
+
+  it('under first-to-accept the producer names what they will supply', async () => {
+    const { as } = await setup({ speculative: 'first_accept' });
+    const id = (await as('corner-deli').post('/requests', else_({ targetPrice: 5 }))).body.request.id;
+    expect((await as('nevern-bakery').post(`/requests/${id}/take`, {})).status).toBe(400);
+    const take = await as('nevern-bakery').post(`/requests/${id}/take`, { productId: 'bara-brith' });
+    expect(take.status).toBe(200);
+    expect(take.body.order).toMatchObject({ total: 150, lines: [{ productId: 'bara-brith', qty: 30 }] });
+  });
+
+  it('something else is never pooled with other requests', async () => {
+    const { as } = await setup({ speculative: 'pooled' });
+    const a = (await as('corner-deli').post('/requests', else_())).body.request.id;
+    await as('grand-hotel').post('/requests', else_());
+    const v = ((await as('nevern-bakery').get('/requests')).body as RequestView[]).find((r) => r.id === a)!;
+    expect(v.pool).toBeUndefined();
+  });
+});

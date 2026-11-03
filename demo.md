@@ -164,6 +164,12 @@ This is the feature the network is built around: buyers can plan, and producers 
 5. Accept a smaller bid first, then a second: two producers can **fill one request together**. The other bids show
    *"Not chosen"* once it is full, and those producers are told.
 6. Show **Withdraw request** and its effect on producers' boards.
+7. **Something else, and a different offer.** In the buyer's product list choose *Something else (not in the list)…* and
+   describe it in the note (required), e.g. *"Seeded rye rolls"*. Every producer within the widest range (100 km) sees it. On
+   the **Demand board** each request has a **What you are offering** field: it starts on the item asked for if the producer
+   sells it, otherwise it is empty and they must choose one of their own products before they can bid. They can also offer a
+   different product from the one asked for. The buyer's bid table shows *Offering: Sourdough loaf*; accepting creates an
+   order for that item and reduces the quantity still wanted on the request.
 
 Then, in **Model Lab**, change **Speculative orders** and repeat step 1 each time:
 
